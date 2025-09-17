@@ -7,6 +7,7 @@ yarn-error.log*
 
 DEPLOYMENT.md
 VERCEL-DEPLOY.md
+MONGODB-SETUP.md
 
 # Environment variables
 .env

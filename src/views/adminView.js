@@ -117,13 +117,6 @@ function renderLoginForm() {
                 <i class="fas fa-sign-in-alt"></i> Login
             </button>
         </form>
-        
-        <div style="text-align: center; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-            <small style="color: #6c757d;">
-                <i class="fas fa-info-circle"></i> 
-                Default: <strong>admin</strong> / <strong>admin123</strong>
-            </small>
-        </div>
     </div>
   `;
 }
