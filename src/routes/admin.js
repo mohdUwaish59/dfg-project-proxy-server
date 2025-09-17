@@ -11,27 +11,59 @@ router.get('/', (req, res) => {
 });
 
 // Admin login
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  const db = getDatabase();
+router.post('/login', async (req, res) => {
+  console.log('🔍 Admin login attempt started');
+  console.log('🔍 Request body:', { username: req.body.username, password: '***' });
   
-  db.get('SELECT * FROM admins WHERE username = ? AND password = ?', 
-    [username, password], (err, row) => {
-      if (err) {
-        logActivity('Admin login error', { error: err.message });
-        return res.status(500).json({ error: 'Database error' });
-      }
-      
-      if (row) {
-        req.session.adminLoggedIn = true;
-        req.session.adminUsername = username;
-        logActivity('Admin login successful', { username });
-        res.redirect('/admin');
-      } else {
-        logActivity('Admin login failed', { username, ip: req.ip });
-        res.redirect('/admin?error=invalid');
-      }
+  const { username, password } = req.body;
+  
+  try {
+    console.log('🔍 Getting database connection...');
+    const db = getDatabase();
+    console.log('✅ Database connection obtained');
+    
+    console.log('🔍 Executing login query...');
+    db.get('SELECT * FROM admins WHERE username = ? AND password = ?', 
+      [username, password], (err, row) => {
+        console.log('🔍 Login query callback called');
+        
+        if (err) {
+          console.error('❌ Database error during login:', err);
+          console.error('❌ Error details:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack
+          });
+          logActivity('Admin login error', { error: err.message });
+          return res.status(500).json({ 
+            error: 'Database error',
+            details: err.message,
+            code: err.code
+          });
+        }
+        
+        console.log('🔍 Query result:', row ? 'User found' : 'User not found');
+        
+        if (row) {
+          req.session.adminLoggedIn = true;
+          req.session.adminUsername = username;
+          logActivity('Admin login successful', { username });
+          console.log('✅ Login successful, redirecting...');
+          res.redirect('/admin');
+        } else {
+          logActivity('Admin login failed', { username, ip: req.ip });
+          console.log('❌ Invalid credentials');
+          res.redirect('/admin?error=invalid');
+        }
+      });
+  } catch (error) {
+    console.error('❌ Unexpected error during login:', error);
+    console.error('❌ Error stack:', error.stack);
+    return res.status(500).json({ 
+      error: 'Unexpected error',
+      details: error.message
     });
+  }
 });
 
 // Admin logout

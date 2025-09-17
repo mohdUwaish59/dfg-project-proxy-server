@@ -39,7 +39,21 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(session(sessionConfig));
 
 // Initialize database
-initDatabase();
+console.log('🔍 SERVER STARTUP DEBUG:');
+console.log('🔍 Environment variables:');
+console.log('  - NODE_ENV:', process.env.NODE_ENV);
+console.log('  - DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('  - SESSION_SECRET exists:', !!process.env.SESSION_SECRET);
+console.log('  - PORT:', process.env.PORT);
+
+console.log('🔍 Initializing database...');
+try {
+  initDatabase();
+  console.log('✅ Database initialization completed');
+} catch (error) {
+  console.error('❌ Database initialization failed:', error);
+  console.error('❌ Error stack:', error.stack);
+}
 
 // Routes
 app.use('/', homeRoutes);
