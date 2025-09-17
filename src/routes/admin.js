@@ -7,7 +7,15 @@ const router = express.Router();
 
 // Admin login page and dashboard
 router.get('/', (req, res) => {
-  console.log('🔍 Admin dashboard accessed, logged in:', !!req.session.adminLoggedIn);
+  console.log('🔍 Admin dashboard accessed');
+  console.log('🔍 Session ID:', req.sessionID);
+  console.log('🔍 Session data:', {
+    adminLoggedIn: req.session.adminLoggedIn,
+    adminUsername: req.session.adminUsername,
+    sessionExists: !!req.session
+  });
+  console.log('🔍 Logged in status:', !!req.session.adminLoggedIn);
+  
   res.send(renderAdminPage(req.session.adminLoggedIn));
 });
 
@@ -61,17 +69,31 @@ router.post('/login', async (req, res) => {
         console.log('🔍 Query result:', row ? 'User found' : 'User not found');
         
         if (row) {
+          console.log('🔍 Setting session data...');
           req.session.adminLoggedIn = true;
           req.session.adminUsername = username;
+          
+          console.log('🔍 Session before save:', {
+            id: req.sessionID,
+            adminLoggedIn: req.session.adminLoggedIn,
+            adminUsername: req.session.adminUsername
+          });
           
           // Force session save for serverless environments
           req.session.save((err) => {
             if (err) {
               console.error('❌ Session save error:', err);
-              return res.status(500).json({ error: 'Session save failed' });
+              return res.status(500).json({ error: 'Session save failed', details: err.message });
             }
             
-            logActivity('Admin login successful', { username });
+            console.log('✅ Session saved successfully');
+            console.log('🔍 Session after save:', {
+              id: req.sessionID,
+              adminLoggedIn: req.session.adminLoggedIn,
+              adminUsername: req.session.adminUsername
+            });
+            
+            logActivity('Admin login successful', { username, sessionId: req.sessionID });
             console.log('✅ Login successful, session saved, redirecting...');
             res.redirect('/admin');
           });

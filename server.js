@@ -21,19 +21,34 @@ app.use(express.static('public'));
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false, // Don't save empty sessions
   cookie: { 
     secure: process.env.NODE_ENV === 'production', // HTTPS in production
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 };
 
-// Use SQLite store for development, memory store for production (Vercel)
-if (process.env.NODE_ENV !== 'production') {
+// Choose session store based on database type
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) {
+  // Use MongoDB session store for production with MongoDB
+  console.log('🍃 Using MongoDB session store');
+  const MongoStore = require('connect-mongo');
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.DATABASE_URL,
+    dbName: 'otree_proxy',
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60 // 24 hours in seconds
+  });
+} else if (process.env.NODE_ENV !== 'production') {
+  // Use SQLite store for development
+  console.log('📁 Using SQLite session store');
   sessionConfig.store = new SQLiteStore({ 
     db: 'sessions.db',
     dir: process.cwd()
   });
+} else {
+  // Use memory store as fallback (not recommended for production)
+  console.log('⚠️ Using memory session store (sessions won\'t persist)');
 }
 
 app.use(session(sessionConfig));
