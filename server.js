@@ -1,6 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
+const cookieParser = require('cookie-parser');
 const path = require('path');
 
 // Import our modules
@@ -16,15 +17,19 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.use(cookieParser());
 
 // Session configuration
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-  resave: false,
-  saveUninitialized: false, // Don't save empty sessions
+  resave: true, // Force session save
+  saveUninitialized: true, // Save all sessions
+  name: 'otree.sid', // Custom session name
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // HTTPS in production
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    secure: false, // Disable secure cookies for testing
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax' // Allow cross-site requests
   }
 };
 
@@ -33,12 +38,20 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) 
   // Use MongoDB session store for production with MongoDB
   console.log('🍃 Using MongoDB session store');
   const MongoStore = require('connect-mongo');
-  sessionConfig.store = MongoStore.create({
-    mongoUrl: process.env.DATABASE_URL,
-    dbName: 'otree_proxy',
-    collectionName: 'sessions',
-    ttl: 24 * 60 * 60 // 24 hours in seconds
-  });
+  
+  try {
+    sessionConfig.store = MongoStore.create({
+      mongoUrl: process.env.DATABASE_URL,
+      dbName: 'otree_proxy',
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60, // 24 hours in seconds
+      touchAfter: 24 * 3600 // lazy session update
+    });
+    console.log('✅ MongoDB session store created');
+  } catch (error) {
+    console.error('❌ MongoDB session store creation failed:', error);
+    console.log('⚠️ Falling back to memory store');
+  }
 } else if (process.env.NODE_ENV !== 'production') {
   // Use SQLite store for development
   console.log('📁 Using SQLite session store');
@@ -52,6 +65,18 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) 
 }
 
 app.use(session(sessionConfig));
+
+// Debug middleware for sessions
+app.use((req, res, next) => {
+  console.log('🔍 Session Debug:', {
+    sessionID: req.sessionID,
+    hasSession: !!req.session,
+    adminLoggedIn: req.session?.adminLoggedIn,
+    url: req.url,
+    method: req.method
+  });
+  next();
+});
 
 // Initialize database
 console.log('🔍 SERVER STARTUP DEBUG:');

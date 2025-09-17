@@ -1,22 +1,25 @@
 const express = require('express');
 const { getDatabase } = require('../database');
-const { generateProxyId, isValidUrl, requireAdmin, sanitizeInput, logActivity } = require('../utils');
+const { generateProxyId, isValidUrl, sanitizeInput, logActivity } = require('../utils');
 const { renderAdminPage } = require('../views/adminView');
+const { setAuthCookie, clearAuthCookie, requireAuth, verifyToken } = require('../auth/jwt-auth');
 
 const router = express.Router();
 
 // Admin login page and dashboard
 router.get('/', (req, res) => {
   console.log('🔍 Admin dashboard accessed');
-  console.log('🔍 Session ID:', req.sessionID);
-  console.log('🔍 Session data:', {
-    adminLoggedIn: req.session.adminLoggedIn,
-    adminUsername: req.session.adminUsername,
-    sessionExists: !!req.session
-  });
-  console.log('🔍 Logged in status:', !!req.session.adminLoggedIn);
   
-  res.send(renderAdminPage(req.session.adminLoggedIn));
+  // Check JWT authentication
+  const token = req.cookies['auth-token'];
+  const user = verifyToken(token);
+  const isLoggedIn = !!user;
+  
+  console.log('🔍 Auth token exists:', !!token);
+  console.log('🔍 User verified:', !!user);
+  console.log('🔍 Logged in status:', isLoggedIn);
+  
+  res.send(renderAdminPage(isLoggedIn));
 });
 
 // Debug endpoint to check admin user (remove in production)
@@ -69,34 +72,17 @@ router.post('/login', async (req, res) => {
         console.log('🔍 Query result:', row ? 'User found' : 'User not found');
         
         if (row) {
-          console.log('🔍 Setting session data...');
-          req.session.adminLoggedIn = true;
-          req.session.adminUsername = username;
+          console.log('🔍 Setting JWT authentication...');
           
-          console.log('🔍 Session before save:', {
-            id: req.sessionID,
-            adminLoggedIn: req.session.adminLoggedIn,
-            adminUsername: req.session.adminUsername
+          // Set JWT cookie instead of session
+          setAuthCookie(res, {
+            username: username,
+            adminLoggedIn: true
           });
           
-          // Force session save for serverless environments
-          req.session.save((err) => {
-            if (err) {
-              console.error('❌ Session save error:', err);
-              return res.status(500).json({ error: 'Session save failed', details: err.message });
-            }
-            
-            console.log('✅ Session saved successfully');
-            console.log('🔍 Session after save:', {
-              id: req.sessionID,
-              adminLoggedIn: req.session.adminLoggedIn,
-              adminUsername: req.session.adminUsername
-            });
-            
-            logActivity('Admin login successful', { username, sessionId: req.sessionID });
-            console.log('✅ Login successful, session saved, redirecting...');
-            res.redirect('/admin');
-          });
+          logActivity('Admin login successful', { username });
+          console.log('✅ Login successful, JWT cookie set, redirecting...');
+          res.redirect('/admin');
         } else {
           logActivity('Admin login failed', { username, ip: req.ip });
           console.log('❌ Invalid credentials');
@@ -115,18 +101,18 @@ router.post('/login', async (req, res) => {
 
 // Admin logout
 router.post('/logout', (req, res) => {
-  const username = req.session.adminUsername;
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Logout failed' });
-    }
-    logActivity('Admin logout', { username });
-    res.redirect('/admin');
-  });
+  const token = req.cookies['auth-token'];
+  const user = verifyToken(token);
+  const username = user?.username || 'unknown';
+  
+  clearAuthCookie(res);
+  logActivity('Admin logout', { username });
+  console.log('✅ User logged out, JWT cookie cleared');
+  res.redirect('/admin');
 });
 
 // Create proxy link
-router.post('/create-link', requireAdmin, (req, res) => {
+router.post('/create-link', requireAuth, (req, res) => {
   const { realUrl, groupName } = req.body;
   const maxUses = 3; // Fixed for oTree experiments
   const db = getDatabase();
@@ -149,7 +135,7 @@ router.post('/create-link', requireAdmin, (req, res) => {
       logActivity('Link created', { 
         proxyId, 
         groupName: sanitizedGroupName, 
-        admin: req.session.adminUsername 
+        admin: req.user.username 
       });
       
       res.redirect('/admin');
@@ -157,7 +143,7 @@ router.post('/create-link', requireAdmin, (req, res) => {
 });
 
 // Get all proxy links
-router.get('/links', requireAdmin, (req, res) => {
+router.get('/links', requireAuth, (req, res) => {
   const db = getDatabase();
   
   db.all('SELECT * FROM proxy_links ORDER BY created_at DESC', (err, rows) => {
@@ -170,7 +156,7 @@ router.get('/links', requireAdmin, (req, res) => {
 });
 
 // Get admin stats
-router.get('/stats', requireAdmin, (req, res) => {
+router.get('/stats', requireAuth, (req, res) => {
   const db = getDatabase();
 
   db.all(`
@@ -190,7 +176,7 @@ router.get('/stats', requireAdmin, (req, res) => {
 });
 
 // Toggle link activation
-router.post('/toggle-link', requireAdmin, (req, res) => {
+router.post('/toggle-link', requireAuth, (req, res) => {
   const { proxyId, activate } = req.body;
   const db = getDatabase();
   
@@ -204,7 +190,7 @@ router.post('/toggle-link', requireAdmin, (req, res) => {
       logActivity('Link toggled', { 
         proxyId, 
         activate, 
-        admin: req.session.adminUsername 
+        admin: req.user.username 
       });
       
       res.json({ success: true });
@@ -212,7 +198,7 @@ router.post('/toggle-link', requireAdmin, (req, res) => {
 });
 
 // Reset link usage
-router.post('/reset-usage', requireAdmin, (req, res) => {
+router.post('/reset-usage', requireAuth, (req, res) => {
   const { proxyId } = req.body;
   const db = getDatabase();
   
@@ -229,7 +215,7 @@ router.post('/reset-usage', requireAdmin, (req, res) => {
       
       logActivity('Usage reset', { 
         proxyId, 
-        admin: req.session.adminUsername 
+        admin: req.user.username 
       });
       
       res.json({ success: true });
@@ -238,7 +224,7 @@ router.post('/reset-usage', requireAdmin, (req, res) => {
 });
 
 // Delete link (POST method for frontend compatibility)
-router.post('/delete-link', requireAdmin, (req, res) => {
+router.post('/delete-link', requireAuth, (req, res) => {
   const { proxyId } = req.body;
   const db = getDatabase();
   
@@ -263,7 +249,7 @@ router.post('/delete-link', requireAdmin, (req, res) => {
       
       logActivity('Link deleted', { 
         proxyId, 
-        admin: req.session.adminUsername 
+        admin: req.user.username 
       });
       
       res.json({ success: true });
@@ -272,7 +258,7 @@ router.post('/delete-link', requireAdmin, (req, res) => {
 });
 
 // Delete link (DELETE method - keeping for API consistency)
-router.delete('/delete-link/:proxyId', requireAdmin, (req, res) => {
+router.delete('/delete-link/:proxyId', requireAuth, (req, res) => {
   const { proxyId } = req.params;
   const db = getDatabase();
   
@@ -289,7 +275,7 @@ router.delete('/delete-link/:proxyId', requireAdmin, (req, res) => {
       
       logActivity('Link deleted', { 
         proxyId, 
-        admin: req.session.adminUsername 
+        admin: req.user.username 
       });
       
       res.json({ success: true });
