@@ -6,7 +6,7 @@ let db = null;
 
 function initDatabase() {
     console.log('🔍 MongoDB initDatabase() called');
-    
+
     if (!process.env.DATABASE_URL) {
         console.error('❌ DATABASE_URL environment variable is required for MongoDB');
         throw new Error('DATABASE_URL environment variable is required');
@@ -26,10 +26,10 @@ function initDatabase() {
         });
 
         console.log('🍃 MongoDB client created');
-        
+
         // Connect and test
         connectAndTest();
-        
+
         return createDatabaseInterface();
     } catch (error) {
         console.error('❌ Error creating MongoDB client:', error);
@@ -39,16 +39,21 @@ function initDatabase() {
 
 async function connectAndTest() {
     try {
+        console.log('🔍 Connecting to MongoDB...');
         await client.connect();
         db = client.db('otree_proxy'); // Use a specific database name
-        
+        console.log('✅ MongoDB client connected');
+
         // Test the connection
         await client.db("admin").command({ ping: 1 });
         console.log('✅ MongoDB connection test successful - Pinged deployment!');
-        
+
         // Create indexes for better performance
         await createIndexes();
-        
+
+        // Initialize default admin immediately after connection
+        await initializeDefaultAdmin();
+
     } catch (error) {
         console.error('❌ MongoDB connection test failed:', error);
         throw error;
@@ -61,7 +66,7 @@ async function createIndexes() {
         await db.collection('admins').createIndex({ username: 1 }, { unique: true });
         await db.collection('proxy_links').createIndex({ proxy_id: 1 }, { unique: true });
         await db.collection('link_usage').createIndex({ proxy_id: 1, user_fingerprint: 1 }, { unique: true });
-        
+
         console.log('✅ MongoDB indexes created');
     } catch (error) {
         console.log('ℹ️ MongoDB indexes may already exist:', error.message);
@@ -131,8 +136,12 @@ function getQueryType(query) {
 
 async function executeMongoQuery(query, params = []) {
     if (!db) {
+        console.log('🔍 Database not connected, connecting...');
         await connectAndTest();
     }
+
+    // Ensure admin exists before any query
+    await ensureAdminExists();
 
     const queryType = getQueryType(query);
     console.log('🔍 Executing MongoDB operation:', queryType);
@@ -160,18 +169,21 @@ async function executeMongoQuery(query, params = []) {
 
 async function handleSelect(query, params) {
     // Parse different SELECT queries and convert to MongoDB operations
-    
+
     // Admin login query
     if (query.includes('FROM admins WHERE username = ? AND password = ?')) {
         const [username, password] = params;
-        return await db.collection('admins').findOne({ username, password });
+        console.log('🔍 MongoDB: Looking for admin user:', username);
+        const result = await db.collection('admins').findOne({ username, password });
+        console.log('🔍 MongoDB: Admin query result:', result ? 'Found user' : 'User not found');
+        return result;
     }
-    
+
     // Get all proxy links
     if (query.includes('FROM proxy_links ORDER BY created_at DESC')) {
         return await db.collection('proxy_links').find({}).sort({ created_at: -1 }).toArray();
     }
-    
+
     // Get stats query
     if (query.includes('COUNT(*) as total')) {
         const total = await db.collection('proxy_links').countDocuments();
@@ -179,17 +191,17 @@ async function handleSelect(query, params) {
         const links = await db.collection('proxy_links').find({}).toArray();
         const participants = links.reduce((sum, link) => sum + (link.current_uses || 0), 0);
         const full = links.filter(link => (link.current_uses || 0) >= (link.max_uses || 3)).length;
-        
+
         return { total, active, participants, full };
     }
-    
+
     // Default: try to parse table name
     const tableMatch = query.match(/FROM\s+(\w+)/i);
     if (tableMatch) {
         const tableName = tableMatch[1];
         return await db.collection(tableName).find({}).toArray();
     }
-    
+
     throw new Error('Unsupported SELECT query');
 }
 
@@ -197,20 +209,20 @@ async function handleInsert(query, params) {
     // Admin creation (during initialization)
     if (query.includes('INTO admins')) {
         const [username, password] = params;
-        const doc = { 
-            username, 
-            password, 
-            created_at: new Date() 
+        const doc = {
+            username,
+            password,
+            created_at: new Date()
         };
-        
+
         // Use upsert to avoid duplicates
         return await db.collection('admins').replaceOne(
-            { username }, 
-            doc, 
+            { username },
+            doc,
             { upsert: true }
         );
     }
-    
+
     // Create proxy link
     if (query.includes('INTO proxy_links')) {
         const [proxy_id, real_url, group_name, max_uses] = params;
@@ -224,10 +236,10 @@ async function handleInsert(query, params) {
             created_at: new Date(),
             created_by: 'admin'
         };
-        
+
         return await db.collection('proxy_links').insertOne(doc);
     }
-    
+
     // Link usage tracking
     if (query.includes('INTO link_usage')) {
         const doc = {
@@ -238,10 +250,10 @@ async function handleInsert(query, params) {
             participant_number: params[4],
             used_at: new Date()
         };
-        
+
         return await db.collection('link_usage').insertOne(doc);
     }
-    
+
     throw new Error('Unsupported INSERT query');
 }
 
@@ -254,7 +266,7 @@ async function handleUpdate(query, params) {
             { $set: { is_active: !!is_active } }
         );
     }
-    
+
     // Reset usage count
     if (query.includes('SET current_uses = 0 WHERE proxy_id = ?')) {
         const [proxy_id] = params;
@@ -263,7 +275,7 @@ async function handleUpdate(query, params) {
             { $set: { current_uses: 0 } }
         );
     }
-    
+
     // Increment usage count
     if (query.includes('SET current_uses = current_uses + 1')) {
         const proxy_id = params[0];
@@ -272,7 +284,7 @@ async function handleUpdate(query, params) {
             { $inc: { current_uses: 1 } }
         );
     }
-    
+
     throw new Error('Unsupported UPDATE query');
 }
 
@@ -282,13 +294,13 @@ async function handleDelete(query, params) {
         const [proxy_id] = params;
         return await db.collection('link_usage').deleteMany({ proxy_id });
     }
-    
+
     // Delete proxy link
     if (query.includes('FROM proxy_links WHERE proxy_id = ?')) {
         const [proxy_id] = params;
         return await db.collection('proxy_links').deleteOne({ proxy_id });
     }
-    
+
     throw new Error('Unsupported DELETE query');
 }
 
@@ -305,8 +317,16 @@ function getDatabase() {
 // Initialize default admin user
 async function initializeDefaultAdmin() {
     try {
-        if (!db) await connectAndTest();
-        
+        if (!client) {
+            console.log('⏳ Waiting for MongoDB client to initialize...');
+            return;
+        }
+
+        if (!db) {
+            await client.connect();
+            db = client.db('otree_proxy');
+        }
+
         const existingAdmin = await db.collection('admins').findOne({ username: 'admin' });
         if (!existingAdmin) {
             await db.collection('admins').insertOne({
@@ -314,17 +334,23 @@ async function initializeDefaultAdmin() {
                 password: 'admin123',
                 created_at: new Date()
             });
-            console.log('✅ Default admin user created');
+            console.log('✅ Default admin user created in MongoDB');
         } else {
-            console.log('ℹ️ Default admin user already exists');
+            console.log('ℹ️ Default admin user already exists in MongoDB');
         }
     } catch (error) {
         console.error('❌ Error initializing default admin:', error);
     }
 }
 
-// Call this after initialization
-setTimeout(initializeDefaultAdmin, 1000);
+// Initialize admin after a delay to ensure connection is ready
+let adminInitialized = false;
+async function ensureAdminExists() {
+    if (!adminInitialized) {
+        await initializeDefaultAdmin();
+        adminInitialized = true;
+    }
+}
 
 module.exports = {
     initDatabase,

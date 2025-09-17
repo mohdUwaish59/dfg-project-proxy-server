@@ -7,7 +7,23 @@ const router = express.Router();
 
 // Admin login page and dashboard
 router.get('/', (req, res) => {
+  console.log('🔍 Admin dashboard accessed, logged in:', !!req.session.adminLoggedIn);
   res.send(renderAdminPage(req.session.adminLoggedIn));
+});
+
+// Debug endpoint to check admin user (remove in production)
+router.get('/debug-admin', async (req, res) => {
+  try {
+    const db = getDatabase();
+    const result = await db.get('SELECT * FROM admins WHERE username = ?', ['admin']);
+    res.json({ 
+      adminExists: !!result,
+      adminData: result ? { username: result.username, created_at: result.created_at } : null,
+      sessionLoggedIn: !!req.session.adminLoggedIn
+    });
+  } catch (error) {
+    res.json({ error: error.message });
+  }
 });
 
 // Admin login
@@ -47,9 +63,18 @@ router.post('/login', async (req, res) => {
         if (row) {
           req.session.adminLoggedIn = true;
           req.session.adminUsername = username;
-          logActivity('Admin login successful', { username });
-          console.log('✅ Login successful, redirecting...');
-          res.redirect('/admin');
+          
+          // Force session save for serverless environments
+          req.session.save((err) => {
+            if (err) {
+              console.error('❌ Session save error:', err);
+              return res.status(500).json({ error: 'Session save failed' });
+            }
+            
+            logActivity('Admin login successful', { username });
+            console.log('✅ Login successful, session saved, redirecting...');
+            res.redirect('/admin');
+          });
         } else {
           logActivity('Admin login failed', { username, ip: req.ip });
           console.log('❌ Invalid credentials');
