@@ -181,17 +181,35 @@ async function handleSelect(query, params) {
 
     // Get all proxy links
     if (query.includes('FROM proxy_links ORDER BY created_at DESC')) {
-        return await db.collection('proxy_links').find({}).sort({ created_at: -1 }).toArray();
+        const links = await db.collection('proxy_links').find({}).sort({ created_at: -1 }).toArray();
+        console.log('🔍 Raw MongoDB links:', links);
+        
+        // Convert MongoDB format to SQLite format for frontend compatibility
+        const convertedLinks = links.map((link, index) => ({
+            id: link._id ? link._id.toString() : index + 1, // Convert ObjectId to string
+            proxy_id: link.proxy_id,
+            real_url: link.real_url,
+            group_name: link.group_name,
+            max_uses: link.max_uses || 3,
+            current_uses: link.current_uses || 0,
+            is_active: link.is_active !== false, // Keep as boolean for JavaScript compatibility
+            created_at: link.created_at instanceof Date ? link.created_at.toISOString() : (link.created_at || new Date().toISOString()),
+            created_by: link.created_by || 'admin'
+        }));
+        
+        console.log('🔍 Converted links for frontend:', convertedLinks);
+        return convertedLinks;
     }
 
     // Get stats query
     if (query.includes('COUNT(*) as total')) {
         const total = await db.collection('proxy_links').countDocuments();
-        const active = await db.collection('proxy_links').countDocuments({ is_active: true });
+        const active = await db.collection('proxy_links').countDocuments({ is_active: { $ne: false } });
         const links = await db.collection('proxy_links').find({}).toArray();
         const participants = links.reduce((sum, link) => sum + (link.current_uses || 0), 0);
         const full = links.filter(link => (link.current_uses || 0) >= (link.max_uses || 3)).length;
 
+        console.log('🔍 Stats calculated:', { total, active, participants, full });
         return { total, active, participants, full };
     }
 

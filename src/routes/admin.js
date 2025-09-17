@@ -30,7 +30,21 @@ router.get('/debug-admin', async (req, res) => {
     res.json({ 
       adminExists: !!result,
       adminData: result ? { username: result.username, created_at: result.created_at } : null,
-      sessionLoggedIn: !!req.session.adminLoggedIn
+      authToken: !!req.cookies['auth-token']
+    });
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
+
+// Debug endpoint to check links data (remove in production)
+router.get('/debug-links', requireAuth, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const links = await db.all('SELECT * FROM proxy_links ORDER BY created_at DESC');
+    res.json({ 
+      count: links.length,
+      links: links
     });
   } catch (error) {
     res.json({ error: error.message });

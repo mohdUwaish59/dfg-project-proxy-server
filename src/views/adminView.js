@@ -541,11 +541,21 @@ function getAdminJavaScript() {
     return `
     // Load stats and links
     Promise.all([
-        fetch('/admin/links').then(r => r.json()),
-        fetch('/admin/stats').then(r => r.json())
+        fetch('/admin/links').then(r => {
+            console.log('🔍 Links response status:', r.status);
+            return r.json();
+        }),
+        fetch('/admin/stats').then(r => {
+            console.log('🔍 Stats response status:', r.status);
+            return r.json();
+        })
     ]).then(([links, stats]) => {
+        console.log('🔍 Received links data:', links);
+        console.log('🔍 Received stats data:', stats);
         renderStats(stats);
         renderLinks(links);
+    }).catch(error => {
+        console.error('❌ Error loading data:', error);
     });
     
     function renderStats(stats) {
@@ -573,17 +583,27 @@ function getAdminJavaScript() {
     }
     
     function renderLinks(links) {
+        console.log('🔍 Frontend renderLinks called with:', links);
+        console.log('🔍 Links array length:', links.length);
+        console.log('🔍 First link data:', links[0]);
+        
         const tbody = document.getElementById('links-tbody');
         const emptyState = document.getElementById('empty-state');
         const table = document.getElementById('links-table');
         
-        if (!tbody) return;
+        if (!tbody) {
+            console.log('❌ tbody element not found');
+            return;
+        }
         
         if (links.length === 0) {
+            console.log('❌ No links found, showing empty state');
             table.style.display = 'none';
             emptyState.style.display = 'block';
             return;
         }
+        
+        console.log('✅ Rendering', links.length, 'links');
         
         table.style.display = 'table';
         emptyState.style.display = 'none';
