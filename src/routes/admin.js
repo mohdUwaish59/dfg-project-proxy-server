@@ -157,36 +157,41 @@ router.post('/create-link', requireAuth, (req, res) => {
 });
 
 // Get all proxy links
-router.get('/links', requireAuth, (req, res) => {
-  const db = getDatabase();
-  
-  db.all('SELECT * FROM proxy_links ORDER BY created_at DESC', (err, rows) => {
-    if (err) {
-      logActivity('Get links error', { error: err.message });
-      return res.status(500).json({ error: 'Database error' });
-    }
+router.get('/links', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 /admin/links endpoint called');
+    const db = getDatabase();
+    const rows = await db.all('SELECT * FROM proxy_links ORDER BY created_at DESC');
+    console.log('🔍 /admin/links returning:', rows.length, 'links');
+    console.log('🔍 First link:', rows[0]);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error('❌ Get links error:', err);
+    logActivity('Get links error', { error: err.message });
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get admin stats
-router.get('/stats', requireAuth, (req, res) => {
-  const db = getDatabase();
-
-  db.all(`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-      SUM(current_uses) as participants,
-      SUM(CASE WHEN current_uses >= max_uses THEN 1 ELSE 0 END) as full
-    FROM proxy_links
-  `, (err, rows) => {
-    if (err) {
-      logActivity('Get stats error', { error: err.message });
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(rows[0]);
-  });
+router.get('/stats', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 /admin/stats endpoint called');
+    const db = getDatabase();
+    const result = await db.get(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
+        SUM(current_uses) as participants,
+        SUM(CASE WHEN current_uses >= max_uses THEN 1 ELSE 0 END) as full
+      FROM proxy_links
+    `);
+    console.log('🔍 /admin/stats returning:', result);
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Get stats error:', err);
+    logActivity('Get stats error', { error: err.message });
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Toggle link activation
