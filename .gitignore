@@ -6,6 +6,8 @@ yarn-error.log*
 
 
 DEPLOYMENT.md
+VERCEL-DEPLOY.md
+
 # Environment variables
 .env
 .env.local
