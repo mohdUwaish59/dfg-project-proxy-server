@@ -7,7 +7,22 @@ function initDatabase() {
   console.log('🔍 DATABASE DEBUG INFO:');
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  console.log('DATABASE_URL starts with mongodb:', process.env.DATABASE_URL?.startsWith('mongodb'));
   console.log('DATABASE_URL starts with postgresql:', process.env.DATABASE_URL?.startsWith('postgresql://'));
+  
+  // Use MongoDB for production (Vercel), SQLite for development
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) {
+    console.log('🍃 Using MongoDB for production');
+    console.log('DATABASE_URL (first 50 chars):', process.env.DATABASE_URL.substring(0, 50) + '...');
+    
+    try {
+      const { initDatabase: initMongo } = require('./database/mongodb');
+      return initMongo();
+    } catch (error) {
+      console.error('❌ Error loading MongoDB module:', error);
+      throw error;
+    }
+  }
   
   // Use PostgreSQL for production (Vercel), SQLite for development
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
@@ -85,6 +100,18 @@ function initDatabase() {
 function getDatabase() {
   console.log('🔍 getDatabase() called');
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  
+  // Use MongoDB for production
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) {
+    console.log('🍃 Getting MongoDB database');
+    try {
+      const { getDatabase: getMongo } = require('./database/mongodb');
+      return getMongo();
+    } catch (error) {
+      console.error('❌ Error getting MongoDB database:', error);
+      throw error;
+    }
+  }
   
   // Use PostgreSQL for production
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
