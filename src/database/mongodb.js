@@ -197,6 +197,36 @@ async function handleSelect(query, params) {
         return convertedLinks;
     }
 
+    // Get single proxy link by ID and active status
+    if (query.includes('FROM proxy_links WHERE proxy_id = ? AND is_active = ?')) {
+        const [proxy_id, is_active] = params;
+        console.log('🔍 MongoDB: Looking for active proxy link:', proxy_id);
+        const result = await db.collection('proxy_links').findOne({ 
+            proxy_id, 
+            is_active: is_active === true || is_active === 1 
+        });
+        console.log('🔍 MongoDB: Proxy link result:', result ? 'Found' : 'Not found');
+        return result;
+    }
+
+    // Get single proxy link by ID
+    if (query.includes('FROM proxy_links WHERE proxy_id = ?')) {
+        const [proxy_id] = params;
+        console.log('🔍 MongoDB: Looking for proxy link:', proxy_id);
+        const result = await db.collection('proxy_links').findOne({ proxy_id });
+        console.log('🔍 MongoDB: Proxy link result:', result ? 'Found' : 'Not found');
+        return result;
+    }
+
+    // Check if fingerprint already used for a proxy
+    if (query.includes('FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?')) {
+        const [proxy_id, user_fingerprint] = params;
+        console.log('🔍 MongoDB: Checking fingerprint usage:', user_fingerprint, 'for proxy:', proxy_id);
+        const result = await db.collection('link_usage').findOne({ proxy_id, user_fingerprint });
+        console.log('🔍 MongoDB: Fingerprint check result:', result ? 'Already used' : 'Not used');
+        return result;
+    }
+
     // Get stats query
     if (query.includes('COUNT(*) as total')) {
         const total = await db.collection('proxy_links').countDocuments();
@@ -260,15 +290,33 @@ async function handleInsert(query, params) {
 
     // Link usage tracking
     if (query.includes('INTO link_usage')) {
-        const doc = {
-            proxy_id: params[0],
-            session_id: params[1],
-            user_ip: params[2],
-            user_fingerprint: params[3],
-            participant_number: params[4],
-            used_at: new Date()
-        };
+        console.log('🔍 MongoDB: Inserting link usage:', params);
+        
+        // Handle different parameter orders
+        let doc;
+        if (params.length === 6) {
+            // New format: proxy_id, session_id, user_ip, user_fingerprint, participant_number, used_at
+            doc = {
+                proxy_id: params[0],
+                session_id: params[1],
+                user_ip: params[2],
+                user_fingerprint: params[3],
+                participant_number: params[4],
+                used_at: params[5] || new Date()
+            };
+        } else {
+            // Old format: proxy_id, session_id, user_ip, user_fingerprint, participant_number
+            doc = {
+                proxy_id: params[0],
+                session_id: params[1],
+                user_ip: params[2],
+                user_fingerprint: params[3],
+                participant_number: params[4],
+                used_at: new Date()
+            };
+        }
 
+        console.log('🔍 MongoDB: Link usage document:', doc);
         return await db.collection('link_usage').insertOne(doc);
     }
 

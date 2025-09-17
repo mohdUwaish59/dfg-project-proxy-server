@@ -11,163 +11,172 @@ const {
 const router = express.Router();
 
 // Main proxy route - shows the intermediate page
-router.get('/:proxyId', (req, res) => {
-  const { proxyId } = req.params;
-  
-  // Ensure session is initialized
-  if (!req.session.initialized) {
-    req.session.initialized = true;
-  }
-  
-  const sessionId = req.session.id;
-  const userIp = getClientIP(req);
-  const db = getDatabase();
+router.get('/:proxyId', async (req, res) => {
+  try {
+    const { proxyId } = req.params;
+    
+    // Ensure session is initialized
+    if (!req.session.initialized) {
+      req.session.initialized = true;
+    }
+    
+    const sessionId = req.session.id || 'no-session';
+    const userIp = getClientIP(req);
+    const db = getDatabase();
 
-  logActivity('Proxy access attempt', { proxyId, sessionId, userIp });
-  console.log('DEBUG: Session ID:', sessionId, 'for proxyId:', proxyId);
+    logActivity('Proxy access attempt', { proxyId, sessionId, userIp });
+    console.log('🔍 Proxy GET request for:', proxyId);
 
-  // Check if link exists and is active
-  db.get('SELECT * FROM proxy_links WHERE proxy_id = ? AND is_active = 1', 
-    [proxyId], (err, link) => {
-      if (err || !link) {
-        logActivity('Link not found or inactive', { proxyId, error: err?.message });
-        return res.status(404).send(renderLinkNotFound());
-      }
+    // Check if link exists and is active
+    const link = await db.get('SELECT * FROM proxy_links WHERE proxy_id = ? AND is_active = ?', [proxyId, true]);
+    
+    if (!link) {
+      logActivity('Link not found or inactive', { proxyId });
+      return res.status(404).send(renderLinkNotFound());
+    }
 
-      // Check if link has reached maximum usage
-      if (link.current_uses >= link.max_uses) {
-        logActivity('Experiment full', { proxyId, groupName: link.group_name });
-        return res.send(renderExperimentFull(link));
-      }
+    console.log('🔍 Link found:', link.group_name, 'Usage:', link.current_uses, '/', link.max_uses);
 
-      // For GET requests, we can't check fingerprint yet, so just show the join page
-      // The fingerprint check will happen on the client side and via POST request
+    // Check if link has reached maximum usage
+    if (link.current_uses >= link.max_uses) {
+      logActivity('Experiment full', { proxyId, groupName: link.group_name });
+      return res.send(renderExperimentFull(link));
+    }
 
-      // Show the join page
-      const remainingSpots = link.max_uses - link.current_uses;
-      logActivity('Showing join page', { 
-        proxyId, 
-        groupName: link.group_name, 
-        remainingSpots 
-      });
-      
-      res.send(renderJoinPage(link, remainingSpots, proxyId));
+    // Show the join page
+    const remainingSpots = link.max_uses - link.current_uses;
+    logActivity('Showing join page', { 
+      proxyId, 
+      groupName: link.group_name, 
+      remainingSpots 
     });
+    
+    console.log('✅ Showing join page for:', link.group_name, 'Remaining spots:', remainingSpots);
+    res.send(renderJoinPage(link, remainingSpots, proxyId));
+    
+  } catch (error) {
+    console.error('❌ Error in proxy GET route:', error);
+    logActivity('Proxy GET error', { proxyId: req.params.proxyId, error: error.message });
+    return res.status(500).send(renderLinkNotFound());
+  }
 });
 
 // Check if fingerprint already exists
-router.post('/:proxyId/check', (req, res) => {
-  const { proxyId } = req.params;
-  const { fingerprint } = req.body;
-  const db = getDatabase();
+router.post('/:proxyId/check', async (req, res) => {
+  try {
+    const { proxyId } = req.params;
+    const { fingerprint } = req.body;
+    const db = getDatabase();
 
-  if (!fingerprint) {
+    console.log('🔍 Checking fingerprint:', fingerprint, 'for proxy:', proxyId);
+
+    if (!fingerprint) {
+      return res.json({ alreadyParticipated: false });
+    }
+
+    // Check if this fingerprint has already been used for this proxy
+    const usage = await db.get('SELECT * FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?', [proxyId, fingerprint]);
+
+    if (usage) {
+      console.log('❌ Fingerprint already used:', fingerprint, 'Participant:', usage.participant_number);
+      
+      // Get link info for the response
+      const link = await db.get('SELECT * FROM proxy_links WHERE proxy_id = ?', [proxyId]);
+      
+      return res.json({ 
+        alreadyParticipated: true,
+        usage: usage,
+        link: link
+      });
+    } else {
+      console.log('✅ Fingerprint not found, allowing participation:', fingerprint);
+      return res.json({ alreadyParticipated: false });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error checking fingerprint:', error);
     return res.json({ alreadyParticipated: false });
   }
-
-  db.get('SELECT * FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?', 
-    [proxyId, fingerprint], (err, usage) => {
-      if (err) {
-        console.error('Error checking fingerprint:', err);
-        return res.json({ alreadyParticipated: false });
-      }
-
-      if (usage) {
-        // Get link info for the response
-        db.get('SELECT * FROM proxy_links WHERE proxy_id = ?', [proxyId], (err, link) => {
-          res.json({ 
-            alreadyParticipated: true,
-            usage: usage,
-            link: link
-          });
-        });
-      } else {
-        res.json({ alreadyParticipated: false });
-      }
-    });
 });
 
 // Mark link as used
-router.post('/:proxyId/use', (req, res) => {
-  const { proxyId } = req.params;
-  const { fingerprint } = req.body;
-  const sessionId = req.session.id;
-  const userIp = getClientIP(req);
-  const db = getDatabase();
+router.post('/:proxyId/use', async (req, res) => {
+  try {
+    const { proxyId } = req.params;
+    const { fingerprint } = req.body;
+    const sessionId = req.session.id || 'no-session';
+    const userIp = getClientIP(req);
+    const db = getDatabase();
 
-  if (!fingerprint) {
-    return res.json({ success: false, error: 'Fingerprint required' });
-  }
+    if (!fingerprint) {
+      return res.json({ success: false, error: 'Fingerprint required' });
+    }
 
-  logActivity('Link usage attempt', { proxyId, sessionId, userIp, fingerprint });
-  console.log('DEBUG: POST /use - Fingerprint:', fingerprint, 'for proxyId:', proxyId);
+    logActivity('Link usage attempt', { proxyId, sessionId, userIp, fingerprint });
+    console.log('🔍 POST /use - Fingerprint:', fingerprint, 'for proxyId:', proxyId);
 
-  db.serialize(() => {
-    // Get current usage count
-    db.get('SELECT current_uses, max_uses, group_name FROM proxy_links WHERE proxy_id = ?', 
-      [proxyId], (err, link) => {
-        if (err || !link) {
-          logActivity('Link not found for usage', { proxyId, error: err?.message });
-          return res.json({ success: false, error: 'Link not found' });
-        }
-        
-        if (link.current_uses >= link.max_uses) {
-          logActivity('Usage exceeded', { proxyId, currentUses: link.current_uses });
-          return res.json({ success: false, error: 'Link usage exceeded' });
-        }
-        
-        const participantNumber = link.current_uses + 1;
-        
-        // Check if fingerprint already used this link
-        db.get('SELECT * FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?', 
-          [proxyId, fingerprint], (err, existingUsage) => {
-            if (existingUsage) {
-              console.log('DEBUG: Fingerprint already used this link, blocking duplicate usage');
-              return res.json({ 
-                success: false, 
-                error: 'Link already used by this user' 
-              });
-            }
-            
-            // Insert usage record
-            db.run('INSERT INTO link_usage (proxy_id, session_id, user_ip, user_fingerprint, participant_number) VALUES (?, ?, ?, ?, ?)', 
-              [proxyId, sessionId, userIp, fingerprint, participantNumber], function(err) {
-              if (err) {
-                logActivity('Usage insert error', { proxyId, error: err.message });
-                return res.json({ success: false, error: 'Database error' });
-              }
-              
-              console.log('DEBUG: Successfully inserted usage record for fingerprint:', fingerprint);
-              // Update current_uses count
-              db.run('UPDATE proxy_links SET current_uses = current_uses + 1 WHERE proxy_id = ?', 
-                [proxyId], function(err) {
-                  if (err) {
-                    logActivity('Usage count update error', { proxyId, error: err.message });
-                    return res.json({ success: false, error: 'Database error' });
-                  }
-                  
-                  logActivity('Link used successfully', { 
-                    proxyId,
-                    groupName: link.group_name,
-                    participantNumber,
-                    sessionId,
-                    userIp,
-                    remainingSpots: link.max_uses - participantNumber
-                  });
-                  
-                  console.log('DEBUG: Link usage completed successfully for fingerprint:', fingerprint, 'participant:', participantNumber);
-                  
-                  res.json({ 
-                    success: true, 
-                    participantNumber: participantNumber,
-                    remainingSpots: link.max_uses - participantNumber,
-                    groupName: link.group_name
-                  });
-                });
-            });
-          });
+    // Get current link info
+    const link = await db.get('SELECT current_uses, max_uses, group_name, real_url FROM proxy_links WHERE proxy_id = ?', [proxyId]);
+    
+    if (!link) {
+      logActivity('Link not found for usage', { proxyId });
+      return res.json({ success: false, error: 'Link not found' });
+    }
+    
+    console.log('🔍 Link info:', link.group_name, 'Current uses:', link.current_uses, 'Max:', link.max_uses);
+    
+    if (link.current_uses >= link.max_uses) {
+      logActivity('Usage exceeded', { proxyId, currentUses: link.current_uses });
+      return res.json({ success: false, error: 'Link usage exceeded' });
+    }
+    
+    // Check if fingerprint already used this link
+    const existingUsage = await db.get('SELECT * FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?', [proxyId, fingerprint]);
+    
+    if (existingUsage) {
+      console.log('❌ Fingerprint already used this link, blocking duplicate usage');
+      return res.json({ 
+        success: false, 
+        error: 'Link already used by this user' 
       });
-  });
+    }
+    
+    const participantNumber = link.current_uses + 1;
+    console.log('🔍 Assigning participant number:', participantNumber);
+    
+    // Insert usage record
+    await db.run('INSERT INTO link_usage (proxy_id, session_id, user_ip, user_fingerprint, participant_number, used_at) VALUES (?, ?, ?, ?, ?, ?)', 
+      [proxyId, sessionId, userIp, fingerprint, participantNumber, new Date()]);
+    
+    console.log('✅ Successfully inserted usage record for fingerprint:', fingerprint);
+    
+    // Update current_uses count
+    await db.run('UPDATE proxy_links SET current_uses = current_uses + 1 WHERE proxy_id = ?', [proxyId]);
+    
+    logActivity('Link used successfully', { 
+      proxyId,
+      groupName: link.group_name,
+      participantNumber,
+      sessionId,
+      userIp,
+      fingerprint,
+      remainingSpots: link.max_uses - participantNumber
+    });
+    
+    console.log('✅ Link usage completed successfully for fingerprint:', fingerprint, 'participant:', participantNumber);
+    
+    res.json({ 
+      success: true, 
+      participantNumber: participantNumber,
+      remainingSpots: link.max_uses - participantNumber,
+      groupName: link.group_name
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in POST /use:', error);
+    logActivity('Usage error', { proxyId: req.params.proxyId, error: error.message });
+    return res.json({ success: false, error: 'Database error: ' + error.message });
+  }
 });
 
 // Get link info (for debugging - admin only)
