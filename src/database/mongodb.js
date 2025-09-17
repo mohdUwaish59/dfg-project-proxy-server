@@ -51,9 +51,6 @@ async function connectAndTest() {
         // Create indexes for better performance
         await createIndexes();
 
-        // Initialize default admin immediately after connection
-        await initializeDefaultAdmin();
-
     } catch (error) {
         console.error('❌ MongoDB connection test failed:', error);
         throw error;
@@ -140,8 +137,7 @@ async function executeMongoQuery(query, params = []) {
         await connectAndTest();
     }
 
-    // Ensure admin exists before any query
-    await ensureAdminExists();
+    // No automatic admin creation for security
 
     const queryType = getQueryType(query);
     console.log('🔍 Executing MongoDB operation:', queryType);
@@ -224,21 +220,25 @@ async function handleSelect(query, params) {
 }
 
 async function handleInsert(query, params) {
-    // Admin creation (during initialization)
+    // Admin creation - only insert if admin doesn't exist (no automatic creation)
     if (query.includes('INTO admins')) {
         const [username, password] = params;
+        
+        // Check if admin already exists
+        const existingAdmin = await db.collection('admins').findOne({ username });
+        if (existingAdmin) {
+            console.log('❌ Admin already exists, not creating duplicate');
+            throw new Error('Admin user already exists');
+        }
+        
         const doc = {
             username,
             password,
             created_at: new Date()
         };
 
-        // Use upsert to avoid duplicates
-        return await db.collection('admins').replaceOne(
-            { username },
-            doc,
-            { upsert: true }
-        );
+        // Only insert, never upsert
+        return await db.collection('admins').insertOne(doc);
     }
 
     // Create proxy link
@@ -332,43 +332,7 @@ function getDatabase() {
     return createDatabaseInterface();
 }
 
-// Initialize default admin user
-async function initializeDefaultAdmin() {
-    try {
-        if (!client) {
-            console.log('⏳ Waiting for MongoDB client to initialize...');
-            return;
-        }
-
-        if (!db) {
-            await client.connect();
-            db = client.db('otree_proxy');
-        }
-
-        const existingAdmin = await db.collection('admins').findOne({ username: 'admin' });
-        if (!existingAdmin) {
-            await db.collection('admins').insertOne({
-                username: 'admin',
-                password: 'admin123',
-                created_at: new Date()
-            });
-            console.log('✅ Default admin user created in MongoDB');
-        } else {
-            console.log('ℹ️ Default admin user already exists in MongoDB');
-        }
-    } catch (error) {
-        console.error('❌ Error initializing default admin:', error);
-    }
-}
-
-// Initialize admin after a delay to ensure connection is ready
-let adminInitialized = false;
-async function ensureAdminExists() {
-    if (!adminInitialized) {
-        await initializeDefaultAdmin();
-        adminInitialized = true;
-    }
-}
+// No automatic admin creation - admins must be created manually for security
 
 module.exports = {
     initDatabase,

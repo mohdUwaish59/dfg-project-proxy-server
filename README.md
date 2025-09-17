@@ -26,10 +26,11 @@ cd otree-proxy-server
 npm install
 npm run generate-secret  # Generate SESSION_SECRET
 cp .env.example .env      # Edit with your settings
+npm run create-admin myusername mySecurePassword123!  # Create admin user
 npm start
 ```
 
-Visit `http://localhost:3000/admin` and login with `admin` / `admin123`
+Visit `http://localhost:3000/admin` and login with your credentials
 
 ### Deploy to Vercel
 
@@ -44,11 +45,11 @@ Visit `http://localhost:3000/admin` and login with `admin` / `admin123`
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | MongoDB Atlas connection string |
-| `SESSION_SECRET` | ✅ | Secure random string (use `npm run generate-secret`) |
-| `NODE_ENV` | ❌ | Set to `production` for deployment |
+| Variable         | Required | Description                                          |
+| ---------------- | -------- | ---------------------------------------------------- |
+| `DATABASE_URL`   | ✅       | MongoDB Atlas connection string                      |
+| `SESSION_SECRET` | ✅       | Secure random string (use `npm run generate-secret`) |
+| `NODE_ENV`       | ❌       | Set to `production` for deployment                   |
 
 ## How It Works
 
@@ -68,6 +69,7 @@ Visit `http://localhost:3000/admin` and login with `admin` / `admin123`
 ## API Endpoints
 
 ### Admin Routes
+
 - `GET /admin` - Admin dashboard
 - `POST /admin/login` - Authentication
 - `GET /admin/links` - List all experiment links
@@ -76,6 +78,7 @@ Visit `http://localhost:3000/admin` and login with `admin` / `admin123`
 - `POST /admin/delete-link` - Delete link
 
 ### Proxy Routes
+
 - `GET /proxy/:id` - Participant landing page
 - `POST /proxy/:id/use` - Register participation and redirect
 

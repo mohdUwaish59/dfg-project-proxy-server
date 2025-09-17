@@ -10,6 +10,7 @@
     "vercel-build": "echo 'Vercel build complete'",
     "deploy": "node deploy.js",
     "generate-secret": "node generate-secret.js",
+    "create-admin": "node create-admin.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate": "node migrate.js",
     "clean": "rm -f proxy.db sessions.db"
