@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from '../contexts/ToastContext';
 import {
   Table,
@@ -23,7 +25,10 @@ import {
   Users,
   Link,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  Search,
+  Filter,
+  X
 } from 'lucide-react';
 
 interface Link {
@@ -52,6 +57,47 @@ interface LinksTableProps {
 
 export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
   const { showToast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [treatmentFilter, setTreatmentFilter] = useState('all');
+
+  // Get unique categories and treatments for filter options
+  const categories = useMemo(() => {
+    const uniqueCategories = Array.from(new Set(links.map(link => link.category).filter(Boolean))) as string[];
+    return uniqueCategories.sort();
+  }, [links]);
+
+  const treatments = useMemo(() => {
+    const uniqueTreatments = Array.from(new Set(links.map(link => link.treatment_title).filter(Boolean))) as string[];
+    return uniqueTreatments.sort();
+  }, [links]);
+
+  // Filter links based on search term and filters
+  const filteredLinks = useMemo(() => {
+    return links.filter(link => {
+      // Search term filter (searches in group name, category, and treatment)
+      const matchesSearch = searchTerm === '' || 
+        link.group_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        link.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        link.treatment_title?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Category filter
+      const matchesCategory = categoryFilter === 'all' || link.category === categoryFilter;
+
+      // Treatment filter
+      const matchesTreatment = treatmentFilter === 'all' || link.treatment_title === treatmentFilter;
+
+      return matchesSearch && matchesCategory && matchesTreatment;
+    });
+  }, [links, searchTerm, categoryFilter, treatmentFilter]);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter('all');
+    setTreatmentFilter('all');
+  };
+
+  const hasActiveFilters = searchTerm !== '' || categoryFilter !== 'all' || treatmentFilter !== 'all';
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -164,6 +210,78 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Search and Filter Section */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by group name, category, or treatment..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Category Filter */}
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Treatment Filter */}
+            <Select value={treatmentFilter} onValueChange={setTreatmentFilter}>
+              <SelectTrigger className="w-full sm:w-[250px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="All Treatments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Treatments</SelectItem>
+                {treatments.map(treatment => (
+                  <SelectItem key={treatment} value={treatment}>
+                    {treatment.length > 40 ? `${treatment.substring(0, 40)}...` : treatment}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Clear Filters Button */}
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                onClick={clearFilters}
+                className="w-full sm:w-auto"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Results Summary */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              Showing {filteredLinks.length} of {links.length} experiment{links.length !== 1 ? 's' : ''}
+            </span>
+            {hasActiveFilters && (
+              <Badge variant="secondary" className="text-xs">
+                Filtered
+              </Badge>
+            )}
+          </div>
+        </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -179,7 +297,27 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {links.map((link) => {
+              {filteredLinks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground">
+                        {hasActiveFilters 
+                          ? 'No experiments match your search criteria' 
+                          : 'No experiments found'
+                        }
+                      </p>
+                      {hasActiveFilters && (
+                        <Button variant="outline" size="sm" onClick={clearFilters}>
+                          Clear filters
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredLinks.map((link) => {
                 // Calculate progress including both completed and waiting participants
                 const totalParticipants = link.current_uses + (link.waiting_count || 0);
                 const usagePercent = (totalParticipants / link.max_uses) * 100;
@@ -389,7 +527,8 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+                })
+              )}
             </TableBody>
           </Table>
         </div>
