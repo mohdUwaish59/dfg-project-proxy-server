@@ -10,10 +10,19 @@ interface Link {
   proxy_id: string;
   group_name: string;
   real_url: string;
+  category?: string;
+  treatment_title?: string;
   current_uses: number;
   max_uses: number;
   is_active: boolean;
+  status?: string;
+  completed_at?: string;
   created_at: string;
+  waiting_count?: number;
+  waiting_participants?: Array<{
+    participant_number: number;
+    joined_at: string;
+  }>;
 }
 
 interface Stats {
@@ -21,6 +30,7 @@ interface Stats {
   active: number;
   participants: number;
   full: number;
+  used?: number;
 }
 
 export default function AdminDashboard() {
@@ -30,6 +40,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
+    
+    // Set up real-time polling for waiting room updates
+    const interval = setInterval(() => {
+      loadData();
+    }, 5000); // Refresh every 5 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -77,7 +94,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <StatsGrid stats={stats} />
+      <StatsGrid stats={stats} links={links} />
       <CreateLinkForm onLinkCreated={handleLinkCreated} />
       <LinksTable 
         links={links} 

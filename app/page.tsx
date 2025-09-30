@@ -111,20 +111,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="border-y bg-gradient-to-r from-primary-50 to-accent-50">
-        <div className="container mx-auto px-4 py-16">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl font-bold text-primary-600">{stat.value}</div>
-                <div className="text-sm text-primary-700/70">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Features Section */}
       <section className="container mx-auto px-4 py-24">
         <div className="mx-auto max-w-2xl text-center mb-16">
@@ -180,11 +166,6 @@ export default function HomePage() {
                   <Link href="/admin">
                     Get Started Now
                     <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="h-12 px-8 border-primary-200 text-primary-700 hover:bg-primary-50">
-                  <Link href="/contact">
-                    Contact Sales
                   </Link>
                 </Button>
               </div>

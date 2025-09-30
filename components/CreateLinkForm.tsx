@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from '../contexts/ToastContext';
 import { Loader2, Plus, Users, Link } from 'lucide-react';
 
@@ -15,7 +16,9 @@ interface CreateLinkFormProps {
 export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
   const [formData, setFormData] = useState({
     groupName: '',
-    realUrl: ''
+    realUrl: '',
+    category: '',
+    treatmentTitle: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
@@ -36,7 +39,7 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
 
       if (response.ok) {
         showToast('success', 'Success', 'Experiment link created successfully!');
-        setFormData({ groupName: '', realUrl: '' });
+        setFormData({ groupName: '', realUrl: '', category: '', treatmentTitle: '' });
         onLinkCreated();
       } else {
         const data = await response.json();
@@ -95,6 +98,59 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
                 required
                 disabled={isLoading}
               />
+            </div>
+          </div>
+
+          {/* New Category and Treatment Fields */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="category">
+                Category
+              </Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="No Gender">No Gender</SelectItem>
+                  <SelectItem value="All Male">All Male</SelectItem>
+                  <SelectItem value="All Female">All Female</SelectItem>
+                  <SelectItem value="Mixed">Mixed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="treatmentTitle">
+                Treatment Title
+              </Label>
+              <Select 
+                value={formData.treatmentTitle} 
+                onValueChange={(value) => setFormData({ ...formData, treatmentTitle: value })}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select treatment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Treatment 1: No communication – No Gender Information">
+                    Treatment 1: No communication – No Gender Information
+                  </SelectItem>
+                  <SelectItem value="Treatment 2: Chat Communication – No Gender Information">
+                    Treatment 2: Chat Communication – No Gender Information
+                  </SelectItem>
+                  <SelectItem value="Treatment 3: Chat Communication – Gender Information">
+                    Treatment 3: Chat Communication – Gender Information
+                  </SelectItem>
+                  <SelectItem value="Treatment 4: Video Chat Communication">
+                    Treatment 4: Video Chat Communication
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

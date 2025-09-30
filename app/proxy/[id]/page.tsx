@@ -3,31 +3,51 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import ProxyJoinPage from '../../../components/ProxyJoinPage';
+import WaitingRoom from '../../../components/WaitingRoom';
 import ProxyErrorPage from '../../../components/ProxyErrorPage';
 
-interface Link {
-  proxy_id: string;
-  group_name: string;
-  real_url: string;
-  current_uses: number;
-  max_uses: number;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface Usage {
-  participant_number: number;
-  used_at: string;
-}
-
 interface ProxyData {
-  success: boolean;
-  link?: Link;
-  usage?: Usage;
-  remainingSpots?: number;
+  canJoin?: boolean;
+  alreadyJoined?: boolean;
+  status?: 'waiting' | 'redirected';
+  participantNumber?: number;
+  currentWaiting?: number;
+  maxParticipants?: number;
+  isGroupComplete?: boolean;
+  groupSessionId?: string;
+  redirectUrl?: string;
+  groupName?: string;
+  category?: string;
+  treatmentTitle?: string;
   error?: string;
   errorType?: 'not_found' | 'full' | 'already_participated' | 'inactive';
+}
+
+// Generate a simple browser fingerprint
+function generateFingerprint() {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx!.textBaseline = 'top';
+  ctx!.font = '14px Arial';
+  ctx!.fillText('Browser fingerprint', 2, 2);
+  
+  const fingerprint = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    new Date().getTimezoneOffset(),
+    canvas.toDataURL()
+  ].join('|');
+  
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < fingerprint.length; i++) {
+    const char = fingerprint.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return Math.abs(hash).toString(16);
 }
 
 export default function ProxyPage() {
@@ -35,99 +55,135 @@ export default function ProxyPage() {
   const proxyId = params?.id as string;
   const [data, setData] = useState<ProxyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fingerprint, setFingerprint] = useState<string>('');
 
   useEffect(() => {
     if (proxyId) {
-      checkProxyStatus();
+      const fp = generateFingerprint();
+      setFingerprint(fp);
+      joinWaitingRoom(fp);
     }
   }, [proxyId]);
 
-  const checkProxyStatus = async () => {
+  const joinWaitingRoom = async (fp: string) => {
     try {
-      // Generate browser fingerprint
-      const fingerprint = generateFingerprint();
-      
-      const response = await fetch(`/api/proxy/${proxyId}/check`, {
+      const response = await fetch(`/api/proxy/${proxyId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fingerprint })
+        body: JSON.stringify({ fingerprint: fp })
       });
 
       const result = await response.json();
-      setData(result);
+      
+      if (!response.ok) {
+        setData({
+          error: result.error,
+          errorType: response.status === 404 ? 'not_found' : 
+                    response.status === 403 ? 'full' : 'inactive'
+        });
+      } else {
+        setData(result);
+        
+        // If group is complete, redirect after a short delay
+        if (result.isGroupComplete && result.redirectUrl) {
+          setTimeout(() => {
+            window.location.href = result.redirectUrl;
+          }, 3000); // 3 second delay to show completion message
+        }
+      }
     } catch (error) {
-      console.error('Error checking proxy status:', error);
+      console.error('Error joining waiting room:', error);
       setData({
-        success: false,
         error: 'Network error. Please try again.',
-        errorType: 'not_found'
+        errorType: 'inactive'
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const generateFingerprint = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.textBaseline = 'top';
-      ctx.font = '14px Arial';
-      ctx.fillText('Browser fingerprint', 2, 2);
-    }
+  const checkStatus = async () => {
+    if (!fingerprint) return;
     
-    const components = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + 'x' + screen.height,
-      screen.colorDepth,
-      new Date().getTimezoneOffset(),
-      !!window.sessionStorage,
-      !!window.localStorage,
-      canvas.toDataURL(),
-      navigator.hardwareConcurrency || 'unknown',
-      navigator.platform
-    ];
-    
-    // Simple hash function
-    let hash = 0;
-    const str = components.join('|');
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+    try {
+      const response = await fetch(`/api/proxy/${proxyId}/status?fingerprint=${fingerprint}`);
+      const result = await response.json();
+      
+      console.log('Status check result:', result); // Debug log
+      
+      if (response.ok) {
+        const newData = {
+          ...data,
+          currentWaiting: result.current_waiting,
+          maxParticipants: result.max_uses,
+          isGroupComplete: result.is_full || result.has_redirected_group,
+          redirectUrl: result.real_url,
+          groupName: result.group_name,
+          category: result.category,
+          treatmentTitle: result.treatment_title
+        };
+
+        // Update user status if available
+        if (result.userStatus) {
+          newData.status = result.userStatus.status;
+          newData.participantNumber = result.userStatus.participantNumber;
+          newData.groupSessionId = result.userStatus.groupSessionId;
+        }
+
+        setData(newData);
+        
+        // If group became complete and user is redirected, redirect immediately
+        if (result.userStatus && result.userStatus.status === 'redirected' && result.real_url) {
+          console.log('Redirecting to:', result.real_url);
+          setTimeout(() => {
+            window.location.href = result.real_url;
+          }, 3000);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking status:', error);
     }
-    return Math.abs(hash).toString(36);
   };
+
+  // Poll for status updates every 2 seconds if not redirected
+  useEffect(() => {
+    if (data && data.status !== 'redirected' && !data.isGroupComplete) {
+      const interval = setInterval(checkStatus, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [data?.status, data?.isGroupComplete, fingerprint]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading experiment...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-accent-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading experiment...</p>
+        </motion.div>
       </div>
     );
   }
 
-  if (!data || !data.success) {
-    return (
-      <ProxyErrorPage 
-        error={data?.error || 'Unknown error'}
-        errorType={data?.errorType || 'not_found'}
-        link={data?.link}
-        usage={data?.usage}
-      />
-    );
+  if (data?.error) {
+    return <ProxyErrorPage error={data.error} errorType={data.errorType || 'inactive'} />;
   }
 
   return (
-    <ProxyJoinPage 
-      link={data.link!}
-      remainingSpots={data.remainingSpots!}
+    <WaitingRoom 
       proxyId={proxyId}
-      onJoinSuccess={checkProxyStatus}
+      participantNumber={data?.participantNumber || 0}
+      currentWaiting={data?.currentWaiting || 0}
+      maxParticipants={data?.maxParticipants || 3}
+      status={data?.status || 'waiting'}
+      isGroupComplete={data?.isGroupComplete || false}
+      redirectUrl={data?.redirectUrl}
+      groupName={data?.groupName}
+      category={data?.category}
+      treatmentTitle={data?.treatmentTitle}
     />
   );
 }

@@ -30,10 +30,19 @@ interface Link {
   proxy_id: string;
   group_name: string;
   real_url: string;
+  category?: string;
+  treatment_title?: string;
   current_uses: number;
   max_uses: number;
   is_active: boolean;
+  status?: string; // active, used, inactive
+  completed_at?: string;
   created_at: string;
+  waiting_count?: number;
+  waiting_participants?: Array<{
+    participant_number: number;
+    joined_at: string;
+  }>;
 }
 
 interface LinksTableProps {
@@ -160,6 +169,8 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Group</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Treatment</TableHead>
                 <TableHead>Proxy Link</TableHead>
                 <TableHead>Usage</TableHead>
                 <TableHead>Status</TableHead>
@@ -169,8 +180,15 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
             </TableHeader>
             <TableBody>
               {links.map((link) => {
-                const usagePercent = (link.current_uses / link.max_uses) * 100;
+                // Calculate progress including both completed and waiting participants
+                const totalParticipants = link.current_uses + (link.waiting_count || 0);
+                const usagePercent = (totalParticipants / link.max_uses) * 100;
                 const isFull = link.current_uses >= link.max_uses;
+                const isUsed = link.status === 'used';
+                
+                // For used links, show full progress and maintain current_uses
+                const displayUsagePercent = isUsed ? 100 : usagePercent;
+                const displayTotalParticipants = isUsed ? link.max_uses : totalParticipants;
                 const proxyUrl = `${window.location.origin}/proxy/${link.proxy_id}`;
 
                 return (
@@ -180,6 +198,20 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">
                           {link.group_name || 'Unnamed Group'}
+                        </span>
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {link.category || 'Not Set'}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="max-w-[200px]">
+                        <span className="text-sm text-muted-foreground truncate" title={link.treatment_title}>
+                          {link.treatment_title || 'Not Set'}
                         </span>
                       </div>
                     </TableCell>
@@ -210,13 +242,66 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
 
                     <TableCell>
                       <div className="space-y-2">
-                        <div className="text-sm font-medium">
-                          {link.current_uses}/{link.max_uses}
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {displayTotalParticipants}/{link.max_uses}
+                            </span>
+                            {isUsed ? (
+                              <span className="text-xs text-green-600 font-medium">
+                                All participants completed
+                              </span>
+                            ) : link.waiting_count && link.waiting_count > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {link.current_uses} completed, {link.waiting_count} waiting
+                              </span>
+                            ) : null}
+                          </div>
+                          {!isUsed && link.is_active && link.waiting_count !== undefined && link.waiting_count > 0 && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              {link.waiting_count} waiting
+                            </Badge>
+                          )}
+                          {isUsed && (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                              Completed
+                            </Badge>
+                          )}
                         </div>
-                        <Progress
-                          value={usagePercent}
-                          className="h-2"
-                        />
+                        <div className="relative">
+                          <Progress
+                            value={displayUsagePercent}
+                            className={`h-2 ${isUsed ? 'opacity-90' : ''}`}
+                          />
+                          {/* Show completed portion in different color for active links with waiting participants */}
+                          {!isUsed && link.waiting_count && link.waiting_count > 0 && (
+                            <div 
+                              className="absolute top-0 left-0 h-2 bg-green-500 rounded-full transition-all"
+                              style={{ width: `${(link.current_uses / link.max_uses) * 100}%` }}
+                            />
+                          )}
+                          {/* For used links, show full green bar */}
+                          {isUsed && (
+                            <div className="absolute top-0 left-0 h-2 bg-green-500 rounded-full w-full transition-all" />
+                          )}
+                        </div>
+                        {link.is_active && link.waiting_count !== undefined && link.waiting_count > 0 && (
+                          <div className="space-y-1">
+                            <div className="text-xs text-muted-foreground">
+                              Participants in waiting room: {link.waiting_participants?.map(p => `#${p.participant_number}`).join(', ')}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span>Completed</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span>Waiting</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
 
@@ -225,12 +310,30 @@ export default function LinksTable({ links, onLinkAction }: LinksTableProps) {
                         variant={
                           !link.is_active
                             ? "secondary"
-                            : isFull
-                              ? "destructive"
-                              : "default"
+                            : isUsed
+                              ? "default"
+                              : isFull
+                                ? "destructive"
+                                : "default"
+                        }
+                        className={
+                          isUsed 
+                            ? "bg-green-100 text-green-800 border-green-300"
+                            : !link.is_active
+                              ? ""
+                              : isFull
+                                ? "bg-red-100 text-red-800 border-red-300"
+                                : "bg-blue-100 text-blue-800 border-blue-300"
                         }
                       >
-                        {!link.is_active ? 'Inactive' : (isFull ? 'Completed' : 'Active')}
+                        {!link.is_active 
+                          ? 'Inactive' 
+                          : isUsed 
+                            ? 'Used' 
+                            : isFull 
+                              ? 'Full' 
+                              : 'Active'
+                        }
                       </Badge>
                     </TableCell>
 

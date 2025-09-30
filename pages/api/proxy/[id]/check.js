@@ -1,6 +1,6 @@
-// Proxy check API route for Next.js
-const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, incrementProxyLinkUsage } = require('../../../../lib/database');
-const { logActivity, getClientIP } = require('../../../../lib/utils-server');
+// Legacy proxy check API route - redirects to new waiting room system
+const { getActiveProxyLink } = require('../../../../lib/database');
+const { logActivity } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,7 +8,6 @@ export default async function handler(req, res) {
   }
 
   const { id: proxyId } = req.query;
-  const { fingerprint } = req.body;
 
   try {
     // Check if link exists and is active
@@ -21,52 +20,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // Check if user already used this link
-    const existingUsage = await checkLinkUsage(proxyId, fingerprint);
-    
-    if (existingUsage) {
-      return res.json({
-        canAccess: true,
-        alreadyUsed: true,
-        redirectUrl: link.real_url,
-        participantNumber: existingUsage.participant_number
-      });
-    }
-
-    // Check if link is full
-    if (link.current_uses >= link.max_uses) {
-      return res.status(403).json({
-        error: 'This experiment link has reached its maximum number of participants',
-        canAccess: false
-      });
-    }
-
-    // Allow access and record usage
-    const participantNumber = link.current_uses + 1;
-    
-    // Record usage
-    await recordLinkUsage(
-      proxyId, 
-      req.headers['x-vercel-id'] || 'unknown', 
-      getClientIP(req), 
-      fingerprint, 
-      participantNumber
-    );
-    
-    // Update usage count
-    await incrementProxyLinkUsage(proxyId);
-    
-    logActivity('Proxy link accessed', { proxyId, participantNumber, fingerprint });
+    // For backward compatibility, redirect to new waiting room system
+    logActivity('Legacy API accessed - redirecting to waiting room', { proxyId });
 
     return res.json({
-      canAccess: true,
-      alreadyUsed: false,
-      redirectUrl: link.real_url,
-      participantNumber: participantNumber
+      canAccess: false,
+      message: 'This experiment now uses a waiting room system. Please refresh the page.',
+      useWaitingRoom: true,
+      maxParticipants: link.max_uses
     });
 
   } catch (error) {
-    console.error('❌ Proxy check error:', error);
+    console.error('❌ Legacy proxy check error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
