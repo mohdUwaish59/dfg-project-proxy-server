@@ -1,24 +1,34 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Remove standalone output for Vercel deployment
   distDir: '.next',
   images: {
     domains: [],
   },
-  // Custom webpack config to handle the integration
+  // Custom webpack config to handle Node.js modules in serverless environment
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
       };
     }
+    
+    // Exclude server.js from client bundle
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@/server': false,
+    };
+    
     return config;
   },
   // Experimental features for better Vercel integration
   experimental: {
-    serverComponentsExternalPackages: ['mongodb', 'sqlite3'],
+    serverComponentsExternalPackages: ['mongodb', 'sqlite3', 'express'],
   },
+  // Serverless target is deprecated in Next.js 14, Vercel handles this automatically
 };
 
 module.exports = nextConfig;
