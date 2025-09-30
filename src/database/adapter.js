@@ -6,10 +6,7 @@ let db = null;
 function initDatabase() {
     const databaseUrl = process.env.DATABASE_URL;
     
-    if (databaseUrl && databaseUrl.startsWith('postgresql://')) {
-        // PostgreSQL for production (Vercel)
-        return initPostgreSQL(databaseUrl);
-    } else if (databaseUrl && databaseUrl.startsWith('mysql://')) {
+    if (databaseUrl && databaseUrl.startsWith('mysql://')) {
         // MySQL for production
         return initMySQL(databaseUrl);
     } else {
@@ -34,15 +31,7 @@ function initSQLite() {
     return db;
 }
 
-function initPostgreSQL(databaseUrl) {
-    // For PostgreSQL, we'll use a simple query interface
-    // In a real production app, you'd use a proper ORM like Prisma or Sequelize
-    console.log('🐘 PostgreSQL support requires additional setup');
-    console.log('Please use the SQL schema provided in DEPLOYMENT.md');
-    
-    // For now, return a mock interface
-    return createMockInterface();
-}
+// PostgreSQL support removed
 
 function initMySQL(databaseUrl) {
     console.log('🐬 MySQL support requires additional setup');

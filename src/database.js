@@ -8,7 +8,7 @@ function initDatabase() {
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
   console.log('DATABASE_URL starts with mongodb:', process.env.DATABASE_URL?.startsWith('mongodb'));
-  console.log('DATABASE_URL starts with postgresql:', process.env.DATABASE_URL?.startsWith('postgresql://'));
+  // PostgreSQL support removed
   
   // Use MongoDB for production (Vercel), SQLite for development
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('mongodb')) {
@@ -24,19 +24,7 @@ function initDatabase() {
     }
   }
   
-  // Use PostgreSQL for production (Vercel), SQLite for development
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
-    console.log('🐘 Using PostgreSQL for production');
-    console.log('DATABASE_URL (first 50 chars):', process.env.DATABASE_URL.substring(0, 50) + '...');
-    
-    try {
-      const { initDatabase: initPG } = require('./database/postgresql');
-      return initPG();
-    } catch (error) {
-      console.error('❌ Error loading PostgreSQL module:', error);
-      throw error;
-    }
-  }
+  // PostgreSQL support removed - using MongoDB only
   
   // SQLite for development
   const dbPath = process.env.NODE_ENV === 'production' 
@@ -113,17 +101,7 @@ function getDatabase() {
     }
   }
   
-  // Use PostgreSQL for production
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql://')) {
-    console.log('🐘 Getting PostgreSQL database');
-    try {
-      const { getDatabase: getPG } = require('./database/postgresql');
-      return getPG();
-    } catch (error) {
-      console.error('❌ Error getting PostgreSQL database:', error);
-      throw error;
-    }
-  }
+  // PostgreSQL support removed - using MongoDB only
   
   // SQLite for development
   console.log('📁 Using SQLite database');

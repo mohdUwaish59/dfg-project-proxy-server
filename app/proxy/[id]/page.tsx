@@ -32,7 +32,7 @@ interface ProxyData {
 
 export default function ProxyPage() {
   const params = useParams();
-  const proxyId = params.id as string;
+  const proxyId = params?.id as string;
   const [data, setData] = useState<ProxyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
