@@ -166,12 +166,21 @@ async function executeMongoQuery(query, params = []) {
 async function handleSelect(query, params) {
     // Parse different SELECT queries and convert to MongoDB operations
 
-    // Admin login query
+    // Admin login query - check username and password separately for better validation
     if (query.includes('FROM admins WHERE username = ? AND password = ?')) {
         const [username, password] = params;
         console.log('🔍 MongoDB: Looking for admin user:', username);
         const result = await db.collection('admins').findOne({ username, password });
         console.log('🔍 MongoDB: Admin query result:', result ? 'Found user' : 'User not found');
+        return result;
+    }
+
+    // Admin user existence check (for validation)
+    if (query.includes('FROM admins WHERE username = ?')) {
+        const [username] = params;
+        console.log('🔍 MongoDB: Checking if admin user exists:', username);
+        const result = await db.collection('admins').findOne({ username });
+        console.log('🔍 MongoDB: User existence check result:', result ? 'User exists' : 'User not found');
         return result;
     }
 

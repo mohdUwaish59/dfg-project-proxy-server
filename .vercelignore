@@ -1,0 +1,10 @@
+# Files to ignore during Vercel deployment
+proxy.db
+sessions.db
+*.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+node_modules/.cache
+.next/cache

@@ -3,6 +3,7 @@ const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const next = require('next');
 
 // Import our modules
 const { initDatabase } = require('./src/database');
@@ -10,8 +11,15 @@ const adminRoutes = require('./src/routes/admin');
 const proxyRoutes = require('./src/routes/proxy');
 const homeRoutes = require('./src/routes/home');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Initialize Next.js
+const dev = process.env.NODE_ENV !== 'production';
+const nextApp = next({ dev, dir: __dirname });
+const handle = nextApp.getRequestHandler();
+
+// Prepare Next.js and start server
+nextApp.prepare().then(() => {
+  const app = express();
+  const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
@@ -95,10 +103,38 @@ try {
   console.error('❌ Error stack:', error.stack);
 }
 
-// Routes
-app.use('/', homeRoutes);
-app.use('/admin', adminRoutes);
+// API Routes (keep existing Express routes for API)
+app.use('/api/admin', adminRoutes);
+app.use('/api/proxy', proxyRoutes);
+
+// Serve Next.js pages first (before legacy routes)
+app.get('/', (req, res) => {
+  return nextApp.render(req, res, '/', req.query);
+});
+
+app.get('/admin', (req, res) => {
+  return nextApp.render(req, res, '/admin', req.query);
+});
+
+// Proxy routes are handled by Express backend above
+
+// Legacy API routes (for backward compatibility) - only for non-GET requests
+app.use('/admin', (req, res, next) => {
+  if (req.method === 'GET') {
+    // Let Next.js handle GET requests
+    return nextApp.render(req, res, '/admin', req.query);
+  }
+  // Let Express handle POST/PUT/DELETE requests
+  adminRoutes(req, res, next);
+});
+
+// Handle proxy routes - Express backend handles all proxy requests
 app.use('/proxy', proxyRoutes);
+
+// Handle all other Next.js routes
+app.all('*', (req, res) => {
+  return handle(req, res);
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -144,12 +180,17 @@ app.use((req, res) => {
   `);
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Proxy server running on http://localhost:${PORT}`);
-  console.log(`📊 Admin panel: http://localhost:${PORT}/admin`);
-  console.log(`🔑 Default admin credentials: admin / admin123`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+  // Start server
+  app.listen(PORT, () => {
+    console.log(`🚀 Proxy server running on http://localhost:${PORT}`);
+    console.log(`📊 Admin panel: http://localhost:${PORT}/admin`);
+    console.log(`🔑 Default admin credentials: admin / admin123`);
+    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`✨ Next.js integration: ENABLED`);
+  });
 
-module.exports = app;
+  module.exports = app;
+}).catch((ex) => {
+  console.error('❌ Error starting Next.js:', ex.stack);
+  process.exit(1);
+});

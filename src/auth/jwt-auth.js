@@ -64,6 +64,7 @@ function verifyToken(token) {
 }
 
 function setAuthCookie(res, payload) {
+    console.log('🔍 Setting auth cookie for user:', payload.username);
     const token = createToken(payload);
     res.cookie('auth-token', token, {
         httpOnly: true,
@@ -71,7 +72,7 @@ function setAuthCookie(res, payload) {
         maxAge: JWT_EXPIRY,
         sameSite: 'lax'
     });
-    console.log('✅ Auth cookie set');
+    console.log('✅ Auth cookie set for user:', payload.username);
 }
 
 function clearAuthCookie(res) {

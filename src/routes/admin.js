@@ -6,6 +6,21 @@ const { setAuthCookie, clearAuthCookie, requireAuth, verifyToken } = require('..
 
 const router = express.Router();
 
+// Check authentication status (for Next.js frontend)
+router.get('/check-auth', (req, res) => {
+  console.log('🔍 Check auth called');
+  const token = req.cookies['auth-token'];
+  console.log('🔍 Auth token exists:', !!token);
+  
+  const user = verifyToken(token);
+  const isLoggedIn = !!user;
+  
+  console.log('🔍 User verified:', !!user);
+  console.log('🔍 Is logged in:', isLoggedIn);
+  
+  res.json({ isLoggedIn, user: user ? { username: user.username } : null });
+});
+
 // Admin login page and dashboard
 router.get('/', (req, res) => {
   console.log('🔍 Admin dashboard accessed');
@@ -26,14 +41,24 @@ router.get('/', (req, res) => {
 router.get('/debug-admin', async (req, res) => {
   try {
     const db = getDatabase();
+    
+    // Check all admins in database
+    const allAdmins = await db.all('SELECT * FROM admins');
+    console.log('🔍 All admins in database:', allAdmins);
+    
+    // Check specific admin
     const result = await db.get('SELECT * FROM admins WHERE username = ?', ['admin']);
+    console.log('🔍 Admin user lookup result:', result);
+    
     res.json({ 
       adminExists: !!result,
       adminData: result ? { username: result.username, created_at: result.created_at } : null,
-      authToken: !!req.cookies['auth-token']
+      authToken: !!req.cookies['auth-token'],
+      allAdmins: allAdmins.map(admin => ({ username: admin.username, created_at: admin.created_at }))
     });
   } catch (error) {
-    res.json({ error: error.message });
+    console.error('🔍 Debug admin error:', error);
+    res.json({ error: error.message, stack: error.stack });
   }
 });
 
@@ -51,6 +76,72 @@ router.get('/debug-links', requireAuth, async (req, res) => {
   }
 });
 
+// Debug login endpoint (remove in production)
+router.post('/debug-login', async (req, res) => {
+  console.log('🔍 DEBUG LOGIN - Request received');
+  const { username, password } = req.body;
+  
+  try {
+    const db = getDatabase();
+    console.log('🔍 DEBUG LOGIN - Database connection obtained');
+    
+    // First, let's see all admins in the database
+    const allAdmins = await db.all('SELECT * FROM admins');
+    console.log('🔍 DEBUG LOGIN - All admins in database:', allAdmins);
+    
+    // Test the exact query that's failing
+    const userRow = await db.get('SELECT * FROM admins WHERE username = ?', [username]);
+    console.log('🔍 DEBUG LOGIN - User lookup result:', userRow);
+    
+    if (!userRow) {
+      console.log('🔍 DEBUG LOGIN - User not found');
+      return res.json({ 
+        success: false, 
+        reason: 'user_not_found',
+        username: username,
+        userRow: null,
+        allAdmins: allAdmins.map(admin => ({ username: admin.username, created_at: admin.created_at }))
+      });
+    }
+    
+    console.log('🔍 DEBUG LOGIN - User found, checking password');
+    console.log('🔍 DEBUG LOGIN - Stored password:', userRow.password);
+    console.log('🔍 DEBUG LOGIN - Provided password:', password);
+    console.log('🔍 DEBUG LOGIN - Passwords match:', userRow.password === password);
+    
+    if (userRow.password !== password) {
+      console.log('🔍 DEBUG LOGIN - Password mismatch');
+      return res.json({ 
+        success: false, 
+        reason: 'invalid_password',
+        username: username,
+        userRow: { username: userRow.username, created_at: userRow.created_at },
+        passwordMatch: false,
+        allAdmins: allAdmins.map(admin => ({ username: admin.username, created_at: admin.created_at }))
+      });
+    }
+    
+    console.log('🔍 DEBUG LOGIN - Authentication successful');
+    return res.json({ 
+      success: true, 
+      reason: 'authenticated',
+      username: username,
+      userRow: { username: userRow.username, created_at: userRow.created_at },
+      passwordMatch: true,
+      allAdmins: allAdmins.map(admin => ({ username: admin.username, created_at: admin.created_at }))
+    });
+    
+  } catch (error) {
+    console.error('🔍 DEBUG LOGIN - Error:', error);
+    return res.json({ 
+      success: false, 
+      reason: 'database_error',
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Admin login
 router.post('/login', async (req, res) => {
   console.log('🔍 Admin login attempt started');
@@ -58,51 +149,84 @@ router.post('/login', async (req, res) => {
   
   const { username, password } = req.body;
   
+  // Validate input
+  if (!username || !password) {
+    console.log('❌ Missing username or password');
+    logActivity('Admin login failed', { username: username || 'missing', reason: 'missing_credentials', ip: req.ip });
+    
+    // Clear any existing auth cookie
+    clearAuthCookie(res);
+    
+    // Always return JSON for API requests (since this is mounted at /api/admin)
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+  
   try {
     console.log('🔍 Getting database connection...');
     const db = getDatabase();
     console.log('✅ Database connection obtained');
     
-    console.log('🔍 Executing login query...');
-    db.get('SELECT * FROM admins WHERE username = ? AND password = ?', 
-      [username, password], (err, row) => {
-        console.log('🔍 Login query callback called');
+    // First, check if the user exists in the database
+    console.log('🔍 Checking if user exists...');
+    
+    try {
+      const userRow = await db.get('SELECT * FROM admins WHERE username = ?', [username]);
+      
+      // If user doesn't exist in database
+      if (!userRow) {
+        console.log('❌ User not found in database:', username);
+        logActivity('Admin login failed', { username, reason: 'user_not_found', ip: req.ip });
         
-        if (err) {
-          console.error('❌ Database error during login:', err);
-          console.error('❌ Error details:', {
-            message: err.message,
-            code: err.code,
-            stack: err.stack
-          });
-          logActivity('Admin login error', { error: err.message });
-          return res.status(500).json({ 
-            error: 'Database error',
-            details: err.message,
-            code: err.code
-          });
-        }
+        // Clear any existing auth cookie
+        clearAuthCookie(res);
         
-        console.log('🔍 Query result:', row ? 'User found' : 'User not found');
+        // Always return JSON for API requests (since this is mounted at /api/admin)
+        return res.status(401).json({ error: 'Invalid username or password' });
+      }
+      
+      // User exists, now check password
+      console.log('🔍 User found, checking password...');
+      if (userRow.password !== password) {
+        console.log('❌ Invalid password for user:', username);
+        logActivity('Admin login failed', { username, reason: 'invalid_password', ip: req.ip });
         
-        if (row) {
-          console.log('🔍 Setting JWT authentication...');
-          
-          // Set JWT cookie instead of session
-          setAuthCookie(res, {
-            username: username,
-            adminLoggedIn: true
-          });
-          
-          logActivity('Admin login successful', { username });
-          console.log('✅ Login successful, JWT cookie set, redirecting...');
-          res.redirect('/admin');
-        } else {
-          logActivity('Admin login failed', { username, ip: req.ip });
-          console.log('❌ Invalid credentials');
-          res.redirect('/admin?error=invalid');
-        }
+        // Clear any existing auth cookie
+        clearAuthCookie(res);
+        
+        // Always return JSON for API requests (since this is mounted at /api/admin)
+        return res.status(401).json({ error: 'Invalid username or password' });
+      }
+      
+      // Both username and password are correct
+      console.log('🔍 Setting JWT authentication...');
+      
+      // Set JWT cookie instead of session
+      setAuthCookie(res, {
+        username: username,
+        adminLoggedIn: true
       });
+      
+      logActivity('Admin login successful', { username });
+      console.log('✅ Login successful, JWT cookie set');
+      
+      // Always return JSON for API requests (since this is mounted at /api/admin)
+      res.json({ success: true, user: { username } });
+      
+    } catch (dbError) {
+      console.error('❌ Database error during user lookup:', dbError);
+      console.error('❌ Error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        stack: dbError.stack
+      });
+      logActivity('Admin login error', { error: dbError.message, username });
+      return res.status(500).json({ 
+        error: 'Database error',
+        details: dbError.message,
+        code: dbError.code
+      });
+    }
+    
   } catch (error) {
     console.error('❌ Unexpected error during login:', error);
     console.error('❌ Error stack:', error.stack);

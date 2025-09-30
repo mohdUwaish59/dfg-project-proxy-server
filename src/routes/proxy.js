@@ -10,7 +10,7 @@ const {
 
 const router = express.Router();
 
-// Main proxy route - shows the intermediate page
+// Main proxy route - redirect to Next.js page with data
 router.get('/:proxyId', async (req, res) => {
   try {
     const { proxyId } = req.params;
@@ -32,6 +32,7 @@ router.get('/:proxyId', async (req, res) => {
     
     if (!link) {
       logActivity('Link not found or inactive', { proxyId });
+      // For now, return old HTML until we can properly integrate Next.js SSR
       return res.status(404).send(renderLinkNotFound());
     }
 
