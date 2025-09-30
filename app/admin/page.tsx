@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, Link2, Settings } from 'lucide-react';
-import AdminLogin from '../../components/AdminLogin';
-import AdminDashboard from '../../components/AdminDashboard';
+import AdminLogin from '@/components/AdminLogin';
+import AdminDashboard from '@/components/AdminDashboard';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);

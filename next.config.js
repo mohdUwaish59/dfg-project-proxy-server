@@ -16,11 +16,7 @@ const nextConfig = {
       };
     }
     
-    // Exclude server.js from client bundle
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@/server': false,
-    };
+    // Let Next.js handle path aliases from tsconfig.json
     
     return config;
   },
