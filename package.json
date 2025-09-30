@@ -2,7 +2,7 @@
   "name": "otree-proxy-server",
   "version": "2.0.0",
   "description": "Professional proxy server for oTree experiment link management",
-  "main": "pages/api/index.js",
+  "main": "next.config.js",
   "scripts": {
     "start": "next start",
     "dev": "nodemon server.js",

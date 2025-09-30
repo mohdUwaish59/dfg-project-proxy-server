@@ -1,5 +1,7 @@
 # Files to ignore during Vercel deployment
 server.js
+src/routes/
+src/views/
 proxy.db
 sessions.db
 *.log
@@ -9,5 +11,3 @@ sessions.db
 .env.production.local
 node_modules/.cache
 .next/cache
-src/routes/
-src/views/

@@ -1,3 +1,6 @@
+// Entry point for local development only
+// Vercel uses Next.js API routes in production
+
 const express = require('express');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
