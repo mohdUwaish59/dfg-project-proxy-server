@@ -8,6 +8,7 @@
     "dev": "next dev",
     "build": "next build",
     "vercel-build": "next build",
+    "type-check": "tsc --noEmit",
     "postbuild": "echo 'Build completed successfully'",
     "deploy": "node deploy.js",
     "generate-secret": "node generate-secret.js",
@@ -46,17 +47,17 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.3.6",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^4.1.11"
-  },
-  "devDependencies": {
+    "typescript": "^5.3.3",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
     "concurrently": "^8.2.2",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.0.4",
-    "nodemon": "^3.0.1",
-    "typescript": "^5.3.3"
+    "nodemon": "^3.0.1"
   },
   "engines": {
     "node": ">=14.0.0",
