@@ -1,6 +1,6 @@
-// Proxy page API route for Vercel
-const { getDatabase } = require('../../../src/database');
-const { logActivity } = require('../../../src/utils');
+// Proxy page API route for Next.js
+const { getActiveProxyLink } = require('../../../lib/database');
+const { logActivity } = require('../../../lib/utils-server');
 
 export default async function handler(req, res) {
   const { id: proxyId } = req.query;
@@ -8,18 +8,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     // Handle proxy page access
     try {
-      // Initialize database if needed
-      try {
-        const { initDatabase } = require('../../../src/database');
-        await initDatabase();
-      } catch (initError) {
-        console.log('ℹ️ Database already initialized or initialization not needed');
-      }
-      
-      const db = getDatabase();
-      
       // Check if link exists and is active
-      const link = await db.get('SELECT * FROM proxy_links WHERE proxy_id = ? AND is_active = ?', [proxyId, true]);
+      const link = await getActiveProxyLink(proxyId);
       
       if (!link) {
         return res.status(404).json({ 

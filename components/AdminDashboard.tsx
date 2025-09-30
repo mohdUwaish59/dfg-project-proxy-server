@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "./ui/skeleton";
 import StatsGrid from './StatsGrid';
 import CreateLinkForm from './CreateLinkForm';
 import LinksTable from './LinksTable';

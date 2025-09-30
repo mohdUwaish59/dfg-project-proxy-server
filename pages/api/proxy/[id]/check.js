@@ -1,6 +1,6 @@
-// Proxy check API route for Vercel
-const { getDatabase } = require('../../../../src/database');
-const { logActivity } = require('../../../../src/utils');
+// Proxy check API route for Next.js
+const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, incrementProxyLinkUsage } = require('../../../../lib/database');
+const { logActivity, getClientIP } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,18 +11,8 @@ export default async function handler(req, res) {
   const { fingerprint } = req.body;
 
   try {
-    // Initialize database if needed
-    try {
-      const { initDatabase } = require('../../../../src/database');
-      await initDatabase();
-    } catch (initError) {
-      console.log('ℹ️ Database already initialized or initialization not needed');
-    }
-    
-    const db = getDatabase();
-    
     // Check if link exists and is active
-    const link = await db.get('SELECT * FROM proxy_links WHERE proxy_id = ? AND is_active = ?', [proxyId, true]);
+    const link = await getActiveProxyLink(proxyId);
     
     if (!link) {
       return res.status(404).json({ 
@@ -32,7 +22,7 @@ export default async function handler(req, res) {
     }
 
     // Check if user already used this link
-    const existingUsage = await db.get('SELECT * FROM link_usage WHERE proxy_id = ? AND user_fingerprint = ?', [proxyId, fingerprint]);
+    const existingUsage = await checkLinkUsage(proxyId, fingerprint);
     
     if (existingUsage) {
       return res.json({
@@ -55,11 +45,16 @@ export default async function handler(req, res) {
     const participantNumber = link.current_uses + 1;
     
     // Record usage
-    await db.run('INSERT INTO link_usage (proxy_id, session_id, user_ip, user_fingerprint, participant_number) VALUES (?, ?, ?, ?, ?)', 
-      [proxyId, req.headers['x-vercel-id'] || 'unknown', req.ip || 'unknown', fingerprint, participantNumber]);
+    await recordLinkUsage(
+      proxyId, 
+      req.headers['x-vercel-id'] || 'unknown', 
+      getClientIP(req), 
+      fingerprint, 
+      participantNumber
+    );
     
     // Update usage count
-    await db.run('UPDATE proxy_links SET current_uses = current_uses + 1 WHERE proxy_id = ?', [proxyId]);
+    await incrementProxyLinkUsage(proxyId);
     
     logActivity('Proxy link accessed', { proxyId, participantNumber, fingerprint });
 

@@ -1,7 +1,7 @@
-// Delete link API route for Vercel
-const { getDatabase } = require('../../../src/database');
-const { verifyToken } = require('../../../src/auth/jwt-auth');
-const { logActivity } = require('../../../src/utils');
+// Delete link API route for Next.js
+const { deleteProxyLink } = require('../../../lib/database');
+const { requireAuth } = require('../../../lib/auth');
+const { logActivity } = require('../../../lib/utils-server');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,11 +9,8 @@ export default async function handler(req, res) {
   }
 
   // Check authentication
-  const token = req.cookies['auth-token'];
-  const user = verifyToken(token);
-  
+  const user = requireAuth(req);
   if (!user) {
-    console.log('❌ Authentication required');
     return res.status(401).json({ error: 'Unauthorized - Admin login required' });
   }
 
@@ -24,23 +21,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Initialize database if needed
-    try {
-      const { initDatabase } = require('../../../src/database');
-      await initDatabase();
-    } catch (initError) {
-      console.log('ℹ️ Database already initialized or initialization not needed');
-    }
+    const result = await deleteProxyLink(proxyId);
     
-    const db = getDatabase();
-    
-    // Delete usage records first
-    await db.run('DELETE FROM link_usage WHERE proxy_id = ?', [proxyId]);
-    
-    // Delete the link
-    const result = await db.run('DELETE FROM proxy_links WHERE proxy_id = ?', [proxyId]);
-    
-    if (result.changes === 0) {
+    if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Link not found' });
     }
     
