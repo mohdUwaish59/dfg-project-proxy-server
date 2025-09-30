@@ -22,7 +22,7 @@ const nextConfig = {
   },
   // Experimental features for better Vercel integration
   experimental: {
-    serverComponentsExternalPackages: ['mongodb', 'sqlite3', 'express'],
+    serverComponentsExternalPackages: ['mongodb'],
   },
   // Serverless target is deprecated in Next.js 14, Vercel handles this automatically
 };

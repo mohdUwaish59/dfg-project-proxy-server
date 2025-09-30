@@ -1,5 +1,6 @@
-// Debug admin API route for Vercel
-const { getDatabase } = require('../../../src/database');
+// Debug admin API route for Next.js
+const { getAllAdmins } = require('../../../lib/database');
+const { getTokenFromRequest } = require('../../../lib/auth');
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -7,28 +8,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Initialize database if needed
-    try {
-      const { initDatabase } = require('../../../src/database');
-      await initDatabase();
-    } catch (initError) {
-      console.log('ℹ️ Database already initialized or initialization not needed');
-    }
-    
-    const db = getDatabase();
-    
-    // Check all admins in database
-    const allAdmins = await db.all('SELECT * FROM admins');
+    const allAdmins = await getAllAdmins();
     console.log('🔍 All admins in database:', allAdmins);
     
-    // Check specific admin
-    const result = await db.get('SELECT * FROM admins WHERE username = ?', ['admin']);
-    console.log('🔍 Admin user lookup result:', result);
+    const adminUser = allAdmins.find(admin => admin.username === 'admin');
     
     res.json({ 
-      adminExists: !!result,
-      adminData: result ? { username: result.username, created_at: result.created_at } : null,
-      authToken: !!req.cookies['auth-token'],
+      adminExists: !!adminUser,
+      adminData: adminUser ? { username: adminUser.username, created_at: adminUser.created_at } : null,
+      authToken: !!getTokenFromRequest(req),
       allAdmins: allAdmins.map(admin => ({ username: admin.username, created_at: admin.created_at }))
     });
   } catch (error) {

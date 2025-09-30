@@ -86,11 +86,11 @@ export default function AdminPage() {
                 </p>
               </div>
             </div>
-            
+
             {isLoggedIn && (
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleLogout}
                 className="gap-2 border-primary-200 text-primary-700 hover:bg-primary-50"
               >

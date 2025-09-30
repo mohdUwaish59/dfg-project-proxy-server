@@ -1,7 +1,7 @@
-// Admin login API route for Vercel
-const { getDatabase } = require('../../../src/database');
-const { setAuthCookie, clearAuthCookie } = require('../../../src/auth/jwt-auth');
-const { logActivity } = require('../../../src/utils');
+// Admin login API route for Next.js
+const { findAdminWithPassword } = require('../../../lib/database');
+const { setAuthCookie, clearAuthCookie } = require('../../../lib/auth');
+const { logActivity, getClientIP } = require('../../../lib/utils-server');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,44 +23,20 @@ export default async function handler(req, res) {
   }
   
   try {
-    console.log('🔍 Getting database connection...');
+    console.log('🔍 Checking user credentials...');
     
-    // Initialize database if needed
-    try {
-      const { initDatabase } = require('../../../src/database');
-      await initDatabase();
-    } catch (initError) {
-      console.log('ℹ️ Database already initialized or initialization not needed');
-    }
+    // Check if user exists and password matches
+    const userRow = await findAdminWithPassword(username, password);
     
-    const db = getDatabase();
-    console.log('✅ Database connection obtained');
-    
-    // First, check if the user exists in the database
-    console.log('🔍 Checking if user exists...');
-    
-    const userRow = await db.get('SELECT * FROM admins WHERE username = ?', [username]);
-    
-    // If user doesn't exist in database
     if (!userRow) {
-      console.log('❌ User not found in database:', username);
-      logActivity('Admin login failed', { username, reason: 'user_not_found', ip: req.ip });
+      console.log('❌ Invalid credentials for user:', username);
+      logActivity('Admin login failed', { username, reason: 'invalid_credentials', ip: getClientIP(req) });
       
       clearAuthCookie(res);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     
-    // User exists, now check password
-    console.log('🔍 User found, checking password...');
-    if (userRow.password !== password) {
-      console.log('❌ Invalid password for user:', username);
-      logActivity('Admin login failed', { username, reason: 'invalid_password', ip: req.ip });
-      
-      clearAuthCookie(res);
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-    
-    // Both username and password are correct
+    // Authentication successful
     console.log('🔍 Setting JWT authentication...');
     
     setAuthCookie(res, {
@@ -73,12 +49,12 @@ export default async function handler(req, res) {
     
     return res.json({ success: true, user: { username } });
     
-  } catch (dbError) {
-    console.error('❌ Database error during user lookup:', dbError);
-    logActivity('Admin login error', { error: dbError.message, username });
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    logActivity('Admin login error', { error: error.message, username });
     return res.status(500).json({ 
-      error: 'Database error',
-      details: dbError.message
+      error: 'Login failed',
+      details: error.message
     });
   }
 }

@@ -1,5 +1,5 @@
-// Check authentication status API route for Vercel
-const { verifyToken } = require('../../../src/auth/jwt-auth');
+// Check authentication status API route for Next.js
+const { getTokenFromRequest, verifyToken } = require('../../../lib/auth');
 
 export default function handler(req, res) {
   if (req.method !== 'GET') {
@@ -7,7 +7,7 @@ export default function handler(req, res) {
   }
 
   console.log('🔍 Check auth called');
-  const token = req.cookies['auth-token'];
+  const token = getTokenFromRequest(req);
   console.log('🔍 Auth token exists:', !!token);
   
   const user = verifyToken(token);

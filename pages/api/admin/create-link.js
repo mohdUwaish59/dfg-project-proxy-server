@@ -1,7 +1,7 @@
-// Create proxy link API route for Vercel
-const { getDatabase } = require('../../../src/database');
-const { verifyToken } = require('../../../src/auth/jwt-auth');
-const { generateProxyId, isValidUrl, sanitizeInput, logActivity } = require('../../../src/utils');
+// Create proxy link API route for Next.js
+const { createProxyLink } = require('../../../lib/database');
+const { requireAuth } = require('../../../lib/auth');
+const { generateProxyId, isValidUrl, sanitizeInput, logActivity } = require('../../../lib/utils-server');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,11 +9,8 @@ export default async function handler(req, res) {
   }
 
   // Check authentication
-  const token = req.cookies['auth-token'];
-  const user = verifyToken(token);
-  
+  const user = requireAuth(req);
   if (!user) {
-    console.log('❌ Authentication required');
     return res.status(401).json({ error: 'Unauthorized - Admin login required' });
   }
 
@@ -26,20 +23,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Initialize database if needed
-    try {
-      const { initDatabase } = require('../../../src/database');
-      await initDatabase();
-    } catch (initError) {
-      console.log('ℹ️ Database already initialized or initialization not needed');
-    }
-    
-    const db = getDatabase();
     const sanitizedGroupName = sanitizeInput(groupName);
     const proxyId = generateProxyId();
     
-    await db.run('INSERT INTO proxy_links (proxy_id, real_url, group_name, max_uses, current_uses) VALUES (?, ?, ?, ?, 0)', 
-      [proxyId, realUrl, sanitizedGroupName || null, maxUses]);
+    await createProxyLink(proxyId, realUrl, sanitizedGroupName || null, maxUses);
     
     logActivity('Link created', { 
       proxyId, 
