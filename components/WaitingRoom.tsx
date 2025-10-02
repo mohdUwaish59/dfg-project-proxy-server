@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
-import { 
-  Users, 
-  Clock, 
-  CheckCircle, 
+import {
+  Users,
+  Clock,
+  CheckCircle,
   ArrowRight,
   Loader2
 } from 'lucide-react';
@@ -79,7 +79,7 @@ export default function WaitingRoom({
     if (isGroupComplete) {
       return "All participants ready! Redirecting to experiment...";
     }
-    
+
     const remaining = maxParticipants - currentWaiting;
     if (remaining === 1) {
       return "Waiting for 1 more participant to join...";
@@ -114,11 +114,11 @@ export default function WaitingRoom({
                 <Users className="h-8 w-8 text-white" />
               )}
             </motion.div>
-            
+
             <CardTitle className="text-2xl font-bold text-gray-900">
               {isGroupComplete ? "Group Complete!" : "Experiment Waiting Room"}
             </CardTitle>
-            
+
             <CardDescription className="text-gray-600 text-lg">
               {getStatusMessage()}
             </CardDescription>
@@ -132,33 +132,6 @@ export default function WaitingRoom({
               </Badge>
             </div>
 
-            {/* Experiment Information */}
-            {(groupName || category || treatmentTitle) && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-3">Experiment Information:</h4>
-                <div className="grid gap-2 text-sm">
-                  {groupName && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-700 font-medium">Group:</span>
-                      <span className="text-blue-800">{groupName}</span>
-                    </div>
-                  )}
-                  {category && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-blue-700 font-medium">Category:</span>
-                      <Badge variant="secondary" className="text-xs">{category}</Badge>
-                    </div>
-                  )}
-                  {treatmentTitle && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-blue-700 font-medium">Treatment:</span>
-                      <span className="text-blue-800 text-xs leading-relaxed">{treatmentTitle}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Progress Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -169,12 +142,12 @@ export default function WaitingRoom({
                   {currentWaiting} / {maxParticipants}
                 </span>
               </div>
-              
-              <Progress 
-                value={progressPercentage} 
+
+              <Progress
+                value={progressPercentage}
                 className="h-3"
               />
-              
+
               <div className="flex justify-between text-xs text-gray-500">
                 <span>Waiting for participants...</span>
                 <span>{Math.round(progressPercentage)}% complete</span>
@@ -191,8 +164,8 @@ export default function WaitingRoom({
                   transition={{ delay: 0.1 * index }}
                   className={`
                     w-16 h-16 rounded-full border-2 flex items-center justify-center
-                    ${index < currentWaiting 
-                      ? 'bg-green-100 border-green-500 text-green-700' 
+                    ${index < currentWaiting
+                      ? 'bg-green-100 border-green-500 text-green-700'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
                     }
                   `}
@@ -222,7 +195,7 @@ export default function WaitingRoom({
                       Please wait while other participants join...
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-center space-x-2 text-gray-500 text-sm">
                     <Clock className="h-4 w-4" />
                     <span>This page will automatically update</span>
@@ -240,7 +213,7 @@ export default function WaitingRoom({
                       <CheckCircle className="h-5 w-5" />
                       <span className="font-semibold">All participants have joined!</span>
                     </div>
-                    
+
                     {showCountdown && (
                       <div className="flex items-center justify-center space-x-2 text-green-600">
                         <ArrowRight className="h-4 w-4" />

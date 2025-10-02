@@ -5,6 +5,7 @@ import { Skeleton } from "./ui/skeleton";
 import StatsGrid from './StatsGrid';
 import CreateLinkForm from './CreateLinkForm';
 import LinksTable from './LinksTable';
+import RedirectSettings from './RedirectSettings';
 
 interface Link {
   proxy_id: string;
@@ -40,12 +41,12 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
-    
+
     // Set up real-time polling for waiting room updates
     const interval = setInterval(() => {
       loadData();
     }, 5000); // Refresh every 5 seconds
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
       if (linksResponse.ok && statsResponse.ok) {
         const linksData = await linksResponse.json();
         const statsData = await statsResponse.json();
-        
+
         setLinks(linksData);
         setStats(statsData);
       }
@@ -96,10 +97,11 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <StatsGrid stats={stats} links={links} />
       <CreateLinkForm onLinkCreated={handleLinkCreated} />
-      <LinksTable 
-        links={links} 
+      <LinksTable
+        links={links}
         onLinkAction={handleLinkAction}
       />
+      <RedirectSettings />
     </div>
   );
 }
