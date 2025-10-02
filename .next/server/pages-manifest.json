@@ -2,8 +2,8 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/api/admin/stats": "pages/api/admin/stats.js",
   "/api/admin/links": "pages/api/admin/links.js",
-  "/api/redirect/male": "pages/api/redirect/male.js",
-  "/api/admin/redirect-settings": "pages/api/admin/redirect-settings.js"
+  "/api/admin/stats": "pages/api/admin/stats.js",
+  "/api/admin/redirect-settings": "pages/api/admin/redirect-settings.js",
+  "/api/redirect/male": "pages/api/redirect/male.js"
 }
