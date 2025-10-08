@@ -107,8 +107,8 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
               <Label htmlFor="category">
                 Category
               </Label>
-              <Select 
-                value={formData.category} 
+              <Select
+                value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
                 disabled={isLoading}
               >
@@ -116,10 +116,9 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="No Gender">No Gender</SelectItem>
                   <SelectItem value="All Male">All Male</SelectItem>
                   <SelectItem value="All Female">All Female</SelectItem>
-                  <SelectItem value="Mixed">Mixed</SelectItem>
+                  <SelectItem value="Mixed">Mixed Gender</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -128,8 +127,8 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
               <Label htmlFor="treatmentTitle">
                 Treatment Title
               </Label>
-              <Select 
-                value={formData.treatmentTitle} 
+              <Select
+                value={formData.treatmentTitle}
                 onValueChange={(value) => setFormData({ ...formData, treatmentTitle: value })}
                 disabled={isLoading}
               >

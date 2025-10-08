@@ -1,5 +1,5 @@
 // Get group status API route for Next.js
-const { getGroupStatus, checkLinkUsage } = require('../../../../lib/database');
+const { getGroupStatus, checkLinkUsage, checkRoomExpiration } = require('../../../../lib/database');
 const { logActivity } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
@@ -11,6 +11,9 @@ export default async function handler(req, res) {
   const { fingerprint } = req.query;
 
   try {
+    // Check room expiration first
+    const roomStatus = await checkRoomExpiration(proxyId);
+    
     // Get overall group status
     const groupStatus = await getGroupStatus(proxyId);
     
@@ -32,12 +35,24 @@ export default async function handler(req, res) {
           joinedAt: userUsage.joined_at,
           redirectedAt: userUsage.redirected_at
         };
+        
+        // If group is complete but user status is still waiting, something went wrong
+        if (groupStatus.has_redirected_group && userUsage.status === 'waiting') {
+          console.log('Warning: User still waiting but group has redirected participants');
+          console.log('User fingerprint:', fingerprint.substring(0, 8) + '...');
+          console.log('User status:', userUsage.status);
+          console.log('Group status:', groupStatus);
+        }
       }
     }
 
     return res.json({
       ...groupStatus,
       userStatus: userStatus,
+      roomStartTime: roomStatus.roomStartTime || null,
+      roomExpired: roomStatus.expired,
+      timeLeft: roomStatus.timeLeft,
+      status: roomStatus.expired ? 'expired' : groupStatus.status || 'waiting',
       timestamp: new Date().toISOString()
     });
 

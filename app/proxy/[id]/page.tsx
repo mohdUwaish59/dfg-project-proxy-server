@@ -9,7 +9,7 @@ import ProxyErrorPage from '../../../components/ProxyErrorPage';
 interface ProxyData {
   canJoin?: boolean;
   alreadyJoined?: boolean;
-  status?: 'waiting' | 'redirected';
+  status?: 'waiting' | 'redirected' | 'expired';
   participantNumber?: number;
   currentWaiting?: number;
   maxParticipants?: number;
@@ -19,6 +19,9 @@ interface ProxyData {
   groupName?: string;
   category?: string;
   treatmentTitle?: string;
+  roomStartTime?: number;
+  roomExpired?: boolean;
+  timeLeft?: number;
   error?: string;
   errorType?: 'not_found' | 'full' | 'already_participated' | 'inactive';
 }
@@ -120,7 +123,11 @@ export default function ProxyPage() {
           redirectUrl: result.real_url,
           groupName: result.group_name,
           category: result.category,
-          treatmentTitle: result.treatment_title
+          treatmentTitle: result.treatment_title,
+          roomStartTime: result.roomStartTime,
+          roomExpired: result.roomExpired,
+          timeLeft: result.timeLeft,
+          status: result.roomExpired ? 'expired' : (result.status || data?.status || 'waiting')
         };
 
         // Update user status if available
@@ -184,6 +191,7 @@ export default function ProxyPage() {
       groupName={data?.groupName}
       category={data?.category}
       treatmentTitle={data?.treatmentTitle}
+      roomStartTime={data?.roomStartTime}
     />
   );
 }

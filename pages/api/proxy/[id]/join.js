@@ -1,5 +1,5 @@
 // Join waiting room API route for Next.js
-const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession } = require('../../../../lib/database');
+const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession, setRoomStartTime, checkRoomExpiration, getAllParticipants } = require('../../../../lib/database');
 const { logActivity, getClientIP } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
@@ -25,17 +25,45 @@ export default async function handler(req, res) {
       });
     }
 
+    // Check if room has expired
+    const roomStatus = await checkRoomExpiration(proxyId);
+    if (roomStatus.expired) {
+      return res.status(403).json({
+        error: 'This waiting room has expired. The time limit was reached.',
+        canJoin: false,
+        status: 'expired'
+      });
+    }
+
     // Check if user already joined this link
     const existingUsage = await checkLinkUsage(proxyId, fingerprint);
     
     if (existingUsage) {
-      // User already joined, return their current status
+      // User already joined, get current group status
+      const allCurrentParticipants = await getAllParticipants(proxyId);
+      const isGroupComplete = allCurrentParticipants.length >= link.max_uses;
+      
+      // Get updated room status for timing info
+      const updatedRoomStatus = await checkRoomExpiration(proxyId);
+      
+      console.log('Existing user rejoining:', {
+        fingerprint: fingerprint.substring(0, 8) + '...',
+        currentStatus: existingUsage.status,
+        totalParticipants: allCurrentParticipants.length,
+        isGroupComplete
+      });
+      
       return res.json({
         canJoin: true,
         alreadyJoined: true,
         status: existingUsage.status,
         participantNumber: existingUsage.participant_number,
-        groupSessionId: existingUsage.group_session_id
+        groupSessionId: existingUsage.group_session_id,
+        currentWaiting: allCurrentParticipants.length,
+        maxParticipants: link.max_uses,
+        isGroupComplete: isGroupComplete,
+        redirectUrl: isGroupComplete ? link.real_url : null,
+        roomStartTime: updatedRoomStatus.roomStartTime || null
       });
     }
 
@@ -50,6 +78,12 @@ export default async function handler(req, res) {
 
     // Add participant to waiting room
     const participantNumber = waitingParticipants.length + 1;
+    
+    // Set room start time if this is the first participant
+    if (waitingParticipants.length === 0) {
+      await setRoomStartTime(proxyId);
+      console.log('Room timer started for proxyId:', proxyId);
+    }
     
     await recordLinkUsage(
       proxyId, 
@@ -66,11 +100,13 @@ export default async function handler(req, res) {
     });
 
     // Check if this completes the group
+    const allParticipants = await getAllParticipants(proxyId);
     const updatedWaitingParticipants = await getWaitingParticipants(proxyId);
-    const isGroupComplete = updatedWaitingParticipants.length >= link.max_uses;
+    const isGroupComplete = allParticipants.length >= link.max_uses;
 
     console.log('Group status check:', {
       proxyId,
+      totalParticipants: allParticipants.length,
       waitingCount: updatedWaitingParticipants.length,
       maxUses: link.max_uses,
       isGroupComplete
@@ -78,29 +114,39 @@ export default async function handler(req, res) {
 
     let groupSessionId = null;
     if (isGroupComplete) {
-      // Create group session and mark all as ready for redirect
-      const participantFingerprints = updatedWaitingParticipants.map(p => p.user_fingerprint);
+      // Create group session and mark all waiting participants as ready for redirect
+      const participantFingerprints = allParticipants.map(p => p.user_fingerprint);
+      
+      console.log('Creating group session for all participants:', participantFingerprints);
+      console.log('Waiting participants:', updatedWaitingParticipants.map(p => p.user_fingerprint));
+      
       groupSessionId = await createGroupSession(proxyId, participantFingerprints);
       
       console.log('Group completed! Created session:', groupSessionId);
+      console.log('Updated participants:', participantFingerprints.length);
       
       logActivity('Group completed - ready for redirect', { 
         proxyId, 
         groupSessionId,
-        participantCount: updatedWaitingParticipants.length
+        participantCount: allParticipants.length,
+        participantFingerprints: participantFingerprints.map(fp => fp.substring(0, 8) + '...')
       });
     }
+
+    // Get updated room status for timing info
+    const updatedRoomStatus = await checkRoomExpiration(proxyId);
 
     return res.json({
       canJoin: true,
       alreadyJoined: false,
       status: isGroupComplete ? 'redirected' : 'waiting',
       participantNumber: participantNumber,
-      currentWaiting: isGroupComplete ? link.max_uses : updatedWaitingParticipants.length,
+      currentWaiting: allParticipants.length,
       maxParticipants: link.max_uses,
       isGroupComplete: isGroupComplete,
       groupSessionId: groupSessionId,
-      redirectUrl: isGroupComplete ? link.real_url : null
+      redirectUrl: isGroupComplete ? link.real_url : null,
+      roomStartTime: updatedRoomStatus.roomStartTime || null
     });
 
   } catch (error) {

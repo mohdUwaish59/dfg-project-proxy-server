@@ -1,5 +1,3 @@
 {
-  "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/redirect/male/page": "app/redirect/male/page.js"
+  "/proxy/[id]/page": "app/proxy/[id]/page.js"
 }
