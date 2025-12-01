@@ -13,7 +13,6 @@ export default function handler(req, res) {
   
   clearAuthCookie(res);
   logActivity('Admin logout', { username });
-  console.log('✅ User logged out, JWT cookie cleared');
   
   res.json({ success: true });
 }

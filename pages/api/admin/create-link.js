@@ -14,12 +14,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized - Admin login required' });
   }
 
-  const { realUrl, groupName, category, treatmentTitle } = req.body;
-  const maxUses = 3; // Fixed for oTree experiments
+  const { realUrl, groupName, category, treatmentTitle, otreeSessionId } = req.body;
+  const maxUses = 200; // Room capacity - can accommodate up to 200 participants
   
   // Validate input
   if (!isValidUrl(realUrl)) {
     return res.status(400).json({ error: 'Invalid URL format' });
+  }
+
+  // Validate oTree Session ID (required)
+  if (!otreeSessionId || otreeSessionId.trim() === '') {
+    return res.status(400).json({ error: 'oTree Session ID is required' });
   }
 
   // Validate category
@@ -41,13 +46,16 @@ export default async function handler(req, res) {
 
   try {
     const sanitizedGroupName = sanitizeInput(groupName);
+    const sanitizedOtreeSessionId = sanitizeInput(otreeSessionId);
     const proxyId = generateProxyId();
     
-    await createProxyLink(proxyId, realUrl, sanitizedGroupName || null, maxUses, category, treatmentTitle);
+    // Post-experiment redirect URL will be configured later after Prolific study creation
+    await createProxyLink(proxyId, realUrl, sanitizedGroupName || null, maxUses, category, treatmentTitle, null, sanitizedOtreeSessionId);
     
     logActivity('Link created', { 
       proxyId, 
       groupName: sanitizedGroupName,
+      otreeSessionId: sanitizedOtreeSessionId,
       category,
       treatmentTitle,
       admin: user.username 

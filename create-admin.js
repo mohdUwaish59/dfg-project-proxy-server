@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 // Script to create a secure admin user manually
+require('dotenv').config();
 const { MongoClient } = require('mongodb');
 const crypto = require('crypto');
 

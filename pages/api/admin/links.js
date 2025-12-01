@@ -15,7 +15,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔍 /admin/links endpoint called');
     const links = await getAllProxyLinks();
     
     // Add real-time waiting room data to each link
@@ -40,7 +39,6 @@ export default async function handler(req, res) {
       })
     );
     
-    console.log('🔍 /admin/links returning:', linksWithWaitingData.length, 'links with waiting data');
     res.json(linksWithWaitingData);
   } catch (err) {
     console.error('❌ Get links error:', err);

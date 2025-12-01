@@ -15,8 +15,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔍 /admin/waiting-rooms endpoint called');
-    
     const links = await getAllProxyLinks();
     const waitingRoomsStatus = [];
 
@@ -43,7 +41,6 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log('🔍 /admin/waiting-rooms returning:', waitingRoomsStatus.length, 'active rooms');
     res.json(waitingRoomsStatus);
 
   } catch (err) {

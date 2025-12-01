@@ -15,9 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔍 /admin/stats endpoint called');
     const stats = await getProxyStats();
-    console.log('🔍 /admin/stats returning:', stats);
     res.json(stats);
   } catch (err) {
     console.error('❌ Get stats error:', err);

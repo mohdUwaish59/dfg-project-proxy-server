@@ -6,6 +6,7 @@ import StatsGrid from './StatsGrid';
 import CreateLinkForm from './CreateLinkForm';
 import LinksTable from './LinksTable';
 import RedirectSettings from './RedirectSettings';
+import WaitingRoomMonitor from './WaitingRoomMonitor';
 
 interface Link {
   proxy_id: string;
@@ -38,16 +39,10 @@ export default function AdminDashboard() {
   const [links, setLinks] = useState<Link[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, participants: 0, full: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-
-    // Set up real-time polling for waiting room updates
-    const interval = setInterval(() => {
-      loadData();
-    }, 5000); // Refresh every 5 seconds
-
-    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -79,6 +74,15 @@ export default function AdminDashboard() {
     loadData(); // Refresh data after any link action
   };
 
+  const handleViewRoom = (proxyId: string) => {
+    setSelectedRoomId(proxyId);
+  };
+
+  const handleBackToDashboard = () => {
+    setSelectedRoomId(null);
+    loadData(); // Refresh data when returning
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -93,13 +97,36 @@ export default function AdminDashboard() {
     );
   }
 
+  // Show waiting room monitor if a room is selected
+  if (selectedRoomId) {
+    return (
+      <WaitingRoomMonitor 
+        proxyId={selectedRoomId} 
+        onBack={handleBackToDashboard}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <button
+          onClick={loadData}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
       <StatsGrid stats={stats} links={links} />
       <CreateLinkForm onLinkCreated={handleLinkCreated} />
       <LinksTable
         links={links}
         onLinkAction={handleLinkAction}
+        onViewRoom={handleViewRoom}
       />
       <RedirectSettings />
     </div>

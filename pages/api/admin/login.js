@@ -8,9 +8,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('🔍 Admin login attempt started');
-  console.log('🔍 Request body:', { username: req.body.username, password: '***' });
-  
   const { username, password } = req.body;
   
   // Validate input
@@ -23,8 +20,6 @@ export default async function handler(req, res) {
   }
   
   try {
-    console.log('🔍 Checking user credentials...');
-    
     // Check if user exists and password matches
     const userRow = await findAdminWithPassword(username, password);
     
@@ -37,15 +32,12 @@ export default async function handler(req, res) {
     }
     
     // Authentication successful
-    console.log('🔍 Setting JWT authentication...');
-    
     setAuthCookie(res, {
       username: username,
       adminLoggedIn: true
     });
     
     logActivity('Admin login successful', { username });
-    console.log('✅ Login successful, JWT cookie set');
     
     return res.json({ success: true, user: { username } });
     

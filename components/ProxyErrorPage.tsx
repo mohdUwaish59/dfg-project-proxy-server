@@ -31,12 +31,14 @@ interface Usage {
 
 interface ProxyErrorPageProps {
   error: string;
-  errorType: 'not_found' | 'full' | 'already_participated' | 'inactive';
+  errorType: 'not_found' | 'full' | 'already_participated' | 'inactive' | 'already_joined';
   link?: Link;
   usage?: Usage;
+  participantNumber?: number;
+  joinedAt?: string;
 }
 
-export default function ProxyErrorPage({ error, errorType, link, usage }: ProxyErrorPageProps) {
+export default function ProxyErrorPage({ error, errorType, link, usage, participantNumber, joinedAt }: ProxyErrorPageProps) {
   const getErrorConfig = () => {
     switch (errorType) {
       case 'not_found':
@@ -58,6 +60,13 @@ export default function ProxyErrorPage({ error, errorType, link, usage }: ProxyE
           title: 'Already Participated',
           description: 'You have already joined this experiment group.',
           icon: CheckCircle,
+          variant: 'default' as const
+        };
+      case 'already_joined':
+        return {
+          title: 'Already in Waiting Room',
+          description: 'You have already joined this waiting room. Please use your original tab/window.',
+          icon: UserCheck,
           variant: 'default' as const
         };
       case 'inactive':
@@ -115,6 +124,28 @@ export default function ProxyErrorPage({ error, errorType, link, usage }: ProxyE
                   </div>
                   <div className="text-sm text-primary-700/70">
                     Joined on: {new Date(usage.used_at).toLocaleString()}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {errorType === 'already_joined' && participantNumber && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <div className="font-semibold mb-2">
+                    You are Participant #{participantNumber}
+                  </div>
+                  <div className="text-sm text-amber-700 space-y-2">
+                    {joinedAt && (
+                      <p>Joined at: {new Date(joinedAt).toLocaleString()}</p>
+                    )}
+                    <p className="font-medium">
+                      ⚠️ Please return to your original tab/window to see your waiting room status.
+                    </p>
+                    <p>
+                      Opening multiple tabs can cause issues with your participation.
+                    </p>
                   </div>
                 </AlertDescription>
               </Alert>

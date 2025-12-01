@@ -1,5 +1,5 @@
 // Join waiting room API route for Next.js
-const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession, setRoomStartTime, checkRoomExpiration, getAllParticipants } = require('../../../../lib/database');
+const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession, checkParticipantExpiration, getAllParticipants, canFormGenderBasedGroup } = require('../../../../lib/database');
 const { logActivity, getClientIP } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
@@ -8,10 +8,22 @@ export default async function handler(req, res) {
   }
 
   const { id: proxyId } = req.query;
-  const { fingerprint } = req.body;
+  const { fingerprint, gender, prolific_pid } = req.body;
 
-  if (!fingerprint) {
-    return res.status(400).json({ error: 'Fingerprint is required' });
+  // TESTING MODE: Use Prolific ID as unique identifier instead of fingerprint
+  const uniqueIdentifier = prolific_pid || fingerprint || 'test_' + Date.now();
+  
+  if (!uniqueIdentifier) {
+    return res.status(400).json({ error: 'Prolific ID or fingerprint is required' });
+  }
+
+  // Validate gender if provided
+  const validGenders = ['MALE', 'FEMALE', 'OTHER'];
+  const normalizedGender = gender ? gender.toUpperCase() : null;
+  
+  if (normalizedGender && !validGenders.includes(normalizedGender)) {
+    console.log('⚠️ Invalid gender provided:', gender);
+    return res.status(400).json({ error: 'Invalid gender. Must be MALE, FEMALE, or OTHER' });
   }
 
   try {
@@ -25,13 +37,45 @@ export default async function handler(req, res) {
       });
     }
 
-    // Check if room has expired
-    const roomStatus = await checkRoomExpiration(proxyId);
-    if (roomStatus.expired) {
-      return res.status(403).json({
-        error: 'This waiting room has expired. The time limit was reached.',
+    // Check gender requirements
+    const category = link.category || 'No Gender';
+    
+    // Check if gender is required but not provided
+    if ((category === 'All Male' || category === 'All Female') && !normalizedGender) {
+      return res.status(400).json({
+        error: `This experiment requires gender information. Please provide your gender to continue.`,
         canJoin: false,
-        status: 'expired'
+        requiredGender: category === 'All Male' ? 'MALE' : 'FEMALE',
+        missingParameter: 'gender',
+        groupName: link.group_name,
+        category: category
+      });
+    }
+    
+    // Validate gender for gender-specific categories
+    if (category === 'All Male' && normalizedGender !== 'MALE') {
+      return res.status(403).json({
+        error: 'This experiment is for male participants only.',
+        canJoin: false,
+        requiredGender: 'MALE'
+      });
+    }
+    
+    if (category === 'All Female' && normalizedGender !== 'FEMALE') {
+      return res.status(403).json({
+        error: 'This experiment is for female participants only.',
+        canJoin: false,
+        requiredGender: 'FEMALE'
+      });
+    }
+    
+    if (category === 'Mixed' && !normalizedGender) {
+      return res.status(400).json({
+        error: 'Gender information is required for mixed gender experiments.',
+        canJoin: false,
+        missingParameter: 'gender',
+        groupName: link.group_name,
+        category: category
       });
     }
 
@@ -39,114 +83,112 @@ export default async function handler(req, res) {
     const existingUsage = await checkLinkUsage(proxyId, fingerprint);
     
     if (existingUsage) {
-      // User already joined, get current group status
-      const allCurrentParticipants = await getAllParticipants(proxyId);
-      const isGroupComplete = allCurrentParticipants.length >= link.max_uses;
-      
-      // Get updated room status for timing info
-      const updatedRoomStatus = await checkRoomExpiration(proxyId);
-      
-      console.log('Existing user rejoining:', {
+      console.log('⚠️ User already joined this room:', {
         fingerprint: fingerprint.substring(0, 8) + '...',
+        participantNumber: existingUsage.participant_number,
         currentStatus: existingUsage.status,
-        totalParticipants: allCurrentParticipants.length,
-        isGroupComplete
+        prolificPid: existingUsage.prolific_pid
       });
       
-      return res.json({
-        canJoin: true,
-        alreadyJoined: true,
-        status: existingUsage.status,
+      // Return error - user cannot join again
+      return res.status(403).json({
+        error: 'You have already joined this waiting room. Please use your original tab/window.',
+        canJoin: false,
+        errorType: 'already_joined',
         participantNumber: existingUsage.participant_number,
-        groupSessionId: existingUsage.group_session_id,
-        currentWaiting: allCurrentParticipants.length,
-        maxParticipants: link.max_uses,
-        isGroupComplete: isGroupComplete,
-        redirectUrl: isGroupComplete ? link.real_url : null,
-        roomStartTime: updatedRoomStatus.roomStartTime || null
+        status: existingUsage.status,
+        joinedAt: existingUsage.joined_at
       });
     }
 
-    // Check if link is already full
-    const waitingParticipants = await getWaitingParticipants(proxyId);
-    if (waitingParticipants.length >= link.max_uses) {
+    // Check if room has reached maximum capacity
+    const allParticipantsCount = await getAllParticipants(proxyId);
+    const totalParticipants = allParticipantsCount.length;
+    
+    if (totalParticipants >= link.max_uses) {
       return res.status(403).json({
-        error: 'This experiment is full. No more participants can join.',
-        canJoin: false
+        error: 'This experiment room is full. Maximum capacity reached.',
+        canJoin: false,
+        errorType: 'full'
       });
     }
 
     // Add participant to waiting room
-    const participantNumber = waitingParticipants.length + 1;
+    const participantNumber = totalParticipants + 1;
     
-    // Set room start time if this is the first participant
-    if (waitingParticipants.length === 0) {
-      await setRoomStartTime(proxyId);
-      console.log('Room timer started for proxyId:', proxyId);
-    }
-    
+    // Record participant with their individual timer FIRST
     await recordLinkUsage(
       proxyId, 
       req.headers['x-vercel-id'] || 'unknown', 
       getClientIP(req), 
-      fingerprint, 
-      participantNumber
+      uniqueIdentifier,  // Use unique identifier instead of fingerprint
+      participantNumber,
+      normalizedGender,
+      prolific_pid
     );
 
     logActivity('Participant joined waiting room', { 
       proxyId, 
       participantNumber, 
-      fingerprint: fingerprint.substring(0, 8) + '...'
+      gender: normalizedGender,
+      prolific_pid: prolific_pid,
+      identifier: uniqueIdentifier.substring(0, 15) + '...'
     });
 
-    // Check if this completes the group
-    const allParticipants = await getAllParticipants(proxyId);
-    const updatedWaitingParticipants = await getWaitingParticipants(proxyId);
-    const isGroupComplete = allParticipants.length >= link.max_uses;
-
-    console.log('Group status check:', {
-      proxyId,
-      totalParticipants: allParticipants.length,
-      waitingCount: updatedWaitingParticipants.length,
-      maxUses: link.max_uses,
-      isGroupComplete
-    });
+    // NOW check if a group can be formed (AFTER participant is recorded)
+    const groupSize = link.group_size || 3; // Fixed group size of 3
+    const groupFormationResult = await canFormGenderBasedGroup(proxyId, category, groupSize);
+    const canFormGroup = groupFormationResult.canForm;
 
     let groupSessionId = null;
-    if (isGroupComplete) {
-      // Create group session and mark all waiting participants as ready for redirect
-      const participantFingerprints = allParticipants.map(p => p.user_fingerprint);
+    let isThisParticipantInGroup = false;
+    
+    if (canFormGroup && groupFormationResult.participants.length > 0) {
+      // Create group session with the selected participants
+      const participantFingerprints = groupFormationResult.participants.map(p => p.user_fingerprint);
       
-      console.log('Creating group session for all participants:', participantFingerprints);
-      console.log('Waiting participants:', updatedWaitingParticipants.map(p => p.user_fingerprint));
+      // Check if the current participant is in this group
+      isThisParticipantInGroup = participantFingerprints.includes(uniqueIdentifier);
       
-      groupSessionId = await createGroupSession(proxyId, participantFingerprints);
+      // Pass group type for mixed gender groups
+      groupSessionId = await createGroupSession(
+        proxyId, 
+        participantFingerprints, 
+        groupFormationResult.groupType
+      );
       
-      console.log('Group completed! Created session:', groupSessionId);
-      console.log('Updated participants:', participantFingerprints.length);
-      
-      logActivity('Group completed - ready for redirect', { 
+      logActivity('Gender-based group formed - participants redirected', { 
         proxyId, 
         groupSessionId,
-        participantCount: allParticipants.length,
+        category,
+        groupType: groupFormationResult.groupType || 'standard',
+        participantCount: participantFingerprints.length,
+        groupNumber: (link.groups_formed || 0) + 1,
         participantFingerprints: participantFingerprints.map(fp => fp.substring(0, 8) + '...')
       });
     }
 
-    // Get updated room status for timing info
-    const updatedRoomStatus = await checkRoomExpiration(proxyId);
+    // Get participant's timer status and current counts
+    const participantTimerStatus = await checkParticipantExpiration(proxyId, uniqueIdentifier);
+    const waitingParticipants = await getWaitingParticipants(proxyId);
 
     return res.json({
       canJoin: true,
       alreadyJoined: false,
-      status: isGroupComplete ? 'redirected' : 'waiting',
+      status: isThisParticipantInGroup ? 'redirected' : 'waiting',
       participantNumber: participantNumber,
-      currentWaiting: allParticipants.length,
-      maxParticipants: link.max_uses,
-      isGroupComplete: isGroupComplete,
-      groupSessionId: groupSessionId,
-      redirectUrl: isGroupComplete ? link.real_url : null,
-      roomStartTime: updatedRoomStatus.roomStartTime || null
+      currentWaiting: waitingParticipants.length,
+      maxParticipants: link.max_uses, // Total room capacity
+      groupSize: groupSize, // Size of each group
+      isGroupComplete: isThisParticipantInGroup,
+      groupSessionId: isThisParticipantInGroup ? groupSessionId : null,
+      redirectUrl: isThisParticipantInGroup ? link.real_url : null,
+      participantTimerStart: participantTimerStatus.timerStart,
+      participantTimeLeft: participantTimerStatus.timeLeft,
+      participantTimerExpired: participantTimerStatus.expired,
+      category: category,
+      participantGender: normalizedGender,
+      groupsFormed: (link.groups_formed || 0) + (canFormGroup ? 1 : 0)
     });
 
   } catch (error) {

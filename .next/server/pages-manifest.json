@@ -1,11 +1,1 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/api/admin/stats": "pages/api/admin/stats.js",
-  "/api/admin/links": "pages/api/admin/links.js",
-  "/api/admin/delete-link": "pages/api/admin/delete-link.js",
-  "/api/proxy/[id]/join": "pages/api/proxy/[id]/join.js",
-  "/api/admin/create-link": "pages/api/admin/create-link.js",
-  "/api/proxy/[id]/status": "pages/api/proxy/[id]/status.js"
-}
+{"/_app":"pages/_app.js","/_error":"pages/_error.js","/api/admin/check-auth":"pages/api/admin/check-auth.js","/api/admin/create-link":"pages/api/admin/create-link.js","/api/admin/debug-admin":"pages/api/admin/debug-admin.js","/api/admin/delete-link":"pages/api/admin/delete-link.js","/api/admin/login":"pages/api/admin/login.js","/api/admin/logout":"pages/api/admin/logout.js","/api/admin/redirect-analytics":"pages/api/admin/redirect-analytics.js","/api/admin/links":"pages/api/admin/links.js","/api/admin/redirect-settings":"pages/api/admin/redirect-settings.js","/api/admin/stats":"pages/api/admin/stats.js","/api/admin/update-post-redirect":"pages/api/admin/update-post-redirect.js","/api/admin/reset-usage":"pages/api/admin/reset-usage.js","/api/admin/toggle-link":"pages/api/admin/toggle-link.js","/api/admin/waiting-room-details":"pages/api/admin/waiting-room-details.js","/api":"pages/api.js","/api/admin/waiting-rooms":"pages/api/admin/waiting-rooms.js","/api/debug/link-status":"pages/api/debug/link-status.js","/api/proxy/[id]":"pages/api/proxy/[id].js","/api/proxy/[id]/check":"pages/api/proxy/[id]/check.js","/api/proxy/[id]/join":"pages/api/proxy/[id]/join.js","/api/proxy/[id]/debug":"pages/api/proxy/[id]/debug.js","/api/test":"pages/api/test.js","/api/redirect/female":"pages/api/redirect/female.js","/api/proxy/[id]/status":"pages/api/proxy/[id]/status.js","/api/redirect/male":"pages/api/redirect/male.js","/api/redirect/[proxyId]":"pages/api/redirect/[proxyId].js","/_document":"pages/_document.js","/404":"pages/404.html"}
