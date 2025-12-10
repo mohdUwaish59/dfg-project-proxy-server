@@ -129,6 +129,32 @@ export default function WaitingRoom({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Calculate effective group count considering Mixed Gender rules
+  const getEffectiveGroupCount = () => {
+    if (category !== 'Mixed') {
+      // For All Male, All Female, or No Gender - use simple math
+      return currentWaiting % 3 || 3;
+    }
+    
+    // For Mixed Gender rooms - conservative approach
+    // Never show "3/3" unless we're actually redirected
+    // This prevents the "Group is full" issue
+    
+    if (currentWaiting === 0) return 0;
+    if (currentWaiting === 1) return 1;
+    if (currentWaiting === 2) return 2;
+    
+    // For 3+ participants in Mixed room:
+    // If we're still waiting (not redirected), it means the current 3 can't form a valid group
+    // So show it as if we're starting a new group
+    if (status === 'waiting') {
+      const remainder = currentWaiting % 3;
+      return remainder === 0 ? 1 : remainder; // Never show 3/3 if still waiting
+    }
+    
+    return currentWaiting % 3 || 3;
+  };
+
   const getStatusMessage = () => {
     if (participantTimerExpired || status === 'expired') {
       return "Your waiting time has expired. You did not get matched with a group in time.";
@@ -139,29 +165,10 @@ export default function WaitingRoom({
     }
 
     // For pool-based system, show waiting for group formation
-    const groupSize = 3; // Fixed group size
-    const neededForGroup = groupSize - (currentWaiting % groupSize || groupSize);
+    const effectiveCount = getEffectiveGroupCount();
+    const neededForGroup = 3 - effectiveCount;
     
-    // Gender-specific messages
-    if (category === 'All Male') {
-      if (neededForGroup === 1) {
-        return "Waiting for 1 more male participant to form a group...";
-      }
-      return `Waiting for ${neededForGroup} more male participants to form a group...`;
-    }
-    
-    if (category === 'All Female') {
-      if (neededForGroup === 1) {
-        return "Waiting for 1 more female participant to form a group...";
-      }
-      return `Waiting for ${neededForGroup} more female participants to form a group...`;
-    }
-    
-    if (category === 'Mixed') {
-      return "Waiting for participants to form a mixed-gender group...";
-    }
-    
-    // Default message
+    // Generic messages (no gender-specific information)
     if (neededForGroup === 1) {
       return "Waiting for 1 more participant to form a group...";
     }
@@ -261,12 +268,12 @@ export default function WaitingRoom({
                     Waiting for Group Formation
                   </span>
                   <span className="text-sm font-bold text-gray-900">
-                    {currentWaiting % 3 || 3} / 3 in current group
+                    {getEffectiveGroupCount()} / 3 in current group
                   </span>
                 </div>
 
                 <Progress
-                  value={((currentWaiting % 3 || 3) / 3) * 100}
+                  value={(getEffectiveGroupCount() / 3) * 100}
                   className="h-3"
                 />
 
@@ -280,7 +287,7 @@ export default function WaitingRoom({
             {/* Current Group Slots Visualization */}
             <div className="flex justify-center space-x-4">
               {Array.from({ length: 3 }, (_, index) => {
-                const currentGroupCount = currentWaiting % 3 || 3;
+                const currentGroupCount = getEffectiveGroupCount();
                 const isSlotFilled = index < currentGroupCount;
                 
                 return (
@@ -373,32 +380,7 @@ export default function WaitingRoom({
               )}
             </AnimatePresence>
 
-            {/* Room Info Banner */}
-            {category && category !== 'No Gender' && !(participantTimerExpired || status === 'expired') && (
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-purple-100">
-                    <Users className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-purple-900 mb-1">
-                      {category === 'All Male' && 'All Male Room'}
-                      {category === 'All Female' && 'All Female Room'}
-                      {category === 'Mixed' && 'Mixed Gender Room'}
-                    </h4>
-                    <p className="text-sm text-purple-800">
-                      Groups of 3 {category === 'All Male' ? 'male' : category === 'All Female' ? 'female' : ''} participants form automatically
-                    </p>
-                    {participantGender && (
-                      <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 bg-white rounded-md border border-purple-200">
-                        <span className="text-xs text-purple-700">Your gender:</span>
-                        <span className="text-xs font-semibold text-purple-900">{participantGender}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Instructions */}
             {!(participantTimerExpired || status === 'expired') && (
@@ -420,7 +402,7 @@ export default function WaitingRoom({
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 font-bold">•</span>
-                    <span><strong>Groups of 3</strong> form automatically as participants join</span>
+                    <span><strong>Groups of 3 participants</strong> form automatically</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 font-bold">•</span>

@@ -83,24 +83,7 @@ export default function GenderCollectionForm({
               </div>
             )}
 
-            {/* Category Info */}
-            {category && category !== 'No Gender' && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-semibold text-purple-900 mb-1">
-                      Group Requirement
-                    </h4>
-                    <p className="text-sm text-purple-800">
-                      {category === 'All Male' && 'This experiment requires male participants only.'}
-                      {category === 'All Female' && 'This experiment requires female participants only.'}
-                      {category === 'Mixed' && 'This experiment requires a mixed-gender group.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* Gender Selection Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -168,31 +151,7 @@ export default function GenderCollectionForm({
                     </div>
                   </motion.button>
 
-                  {/* Other Option - Only for Mixed or No Gender */}
-                  {(!requiredGender || category === 'Mixed') && (
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setSelectedGender('OTHER')}
-                      className={`
-                        w-full p-4 rounded-lg border-2 text-left transition-all cursor-pointer
-                        ${selectedGender === 'OTHER'
-                          ? 'border-primary-500 bg-primary-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                        }
-                      `}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">Other / Prefer not to say</span>
-                        {selectedGender === 'OTHER' && (
-                          <div className="h-5 w-5 rounded-full bg-primary-500 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-white"></div>
-                          </div>
-                        )}
-                      </div>
-                    </motion.button>
-                  )}
+
                 </div>
               </div>
 

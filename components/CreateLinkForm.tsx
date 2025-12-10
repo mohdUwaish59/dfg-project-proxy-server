@@ -33,6 +33,13 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all fields are filled
+    if (!formData.groupName || !formData.realUrl || !formData.otreeSessionId || !formData.category || !formData.treatmentTitle) {
+      showToast('error', 'Validation Error', 'Please fill in all required fields');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -99,6 +106,7 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
               <Label htmlFor="groupName" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Group Name
+                <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.groupName}
@@ -130,6 +138,7 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
               <Label htmlFor="realUrl" className="flex items-center gap-2">
                 <Link className="h-4 w-4" />
                 oTree Experiment URL
+                <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="realUrl"
@@ -169,11 +178,13 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
             <div className="space-y-2">
               <Label htmlFor="category">
                 Category
+                <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
                 disabled={isLoading}
+                required
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
@@ -189,11 +200,13 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
             <div className="space-y-2">
               <Label htmlFor="treatmentTitle">
                 Treatment Title
+                <span className="text-red-500">*</span>
               </Label>
               <Select
                 value={formData.treatmentTitle}
                 onValueChange={(value) => setFormData({ ...formData, treatmentTitle: value })}
                 disabled={isLoading}
+                required
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select treatment" />
@@ -216,7 +229,11 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
             </div>
           </div>
 
-          <Button type="submit" disabled={isLoading} className="w-full md:w-auto bg-gradient-to-r from-success-600 to-success-700 hover:from-success-700 hover:to-success-800">
+          <Button 
+            type="submit" 
+            disabled={isLoading || !formData.groupName || !formData.realUrl || !formData.otreeSessionId || !formData.category || !formData.treatmentTitle} 
+            className="w-full md:w-auto bg-gradient-to-r from-success-600 to-success-700 hover:from-success-700 hover:to-success-800"
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

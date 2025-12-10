@@ -18,12 +18,12 @@ export default async function handler(req, res) {
   }
 
   // Validate gender if provided
-  const validGenders = ['MALE', 'FEMALE', 'OTHER'];
+  const validGenders = ['MALE', 'FEMALE'];
   const normalizedGender = gender ? gender.toUpperCase() : null;
   
   if (normalizedGender && !validGenders.includes(normalizedGender)) {
     console.log('⚠️ Invalid gender provided:', gender);
-    return res.status(400).json({ error: 'Invalid gender. Must be MALE, FEMALE, or OTHER' });
+    return res.status(400).json({ error: 'Invalid gender. Must be MALE or FEMALE' });
   }
 
   try {
