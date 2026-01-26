@@ -1,5 +1,5 @@
 // Join waiting room API route for Next.js
-const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession, checkParticipantExpiration, getAllParticipants, canFormGenderBasedGroup } = require('../../../../lib/database');
+const { getActiveProxyLink, checkLinkUsage, recordLinkUsage, getWaitingParticipants, createGroupSession, checkParticipantExpiration, getAllParticipants, deleteExpiredParticipant } = require('../../../../lib/database');
 const { logActivity, getClientIP } = require('../../../../lib/utils-server');
 
 export default async function handler(req, res) {
@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   const { id: proxyId } = req.query;
-  const { fingerprint, gender, prolific_pid } = req.body;
+  const { fingerprint, prolific_pid } = req.body;
 
   // TESTING MODE: Use Prolific ID as unique identifier instead of fingerprint
   const uniqueIdentifier = prolific_pid || fingerprint || 'test_' + Date.now();
@@ -16,15 +16,8 @@ export default async function handler(req, res) {
   if (!uniqueIdentifier) {
     return res.status(400).json({ error: 'Prolific ID or fingerprint is required' });
   }
-
-  // Validate gender if provided
-  const validGenders = ['MALE', 'FEMALE'];
-  const normalizedGender = gender ? gender.toUpperCase() : null;
   
-  if (normalizedGender && !validGenders.includes(normalizedGender)) {
-    console.log('⚠️ Invalid gender provided:', gender);
-    return res.status(400).json({ error: 'Invalid gender. Must be MALE or FEMALE' });
-  }
+  console.log('🔍 Using unique identifier:', uniqueIdentifier.substring(0, 15) + '...');
 
   try {
     // Check if link exists and is active
@@ -37,73 +30,91 @@ export default async function handler(req, res) {
       });
     }
 
-    // Check gender requirements
-    const category = link.category || 'No Gender';
-    
-    // Check if gender is required but not provided
-    if ((category === 'All Male' || category === 'All Female') && !normalizedGender) {
-      return res.status(400).json({
-        error: `This experiment requires gender information. Please provide your gender to continue.`,
-        canJoin: false,
-        requiredGender: category === 'All Male' ? 'MALE' : 'FEMALE',
-        missingParameter: 'gender',
-        groupName: link.group_name,
-        category: category
-      });
-    }
-    
-    // Validate gender for gender-specific categories
-    if (category === 'All Male' && normalizedGender !== 'MALE') {
-      return res.status(403).json({
-        error: 'This experiment is for male participants only.',
-        canJoin: false,
-        requiredGender: 'MALE'
-      });
-    }
-    
-    if (category === 'All Female' && normalizedGender !== 'FEMALE') {
-      return res.status(403).json({
-        error: 'This experiment is for female participants only.',
-        canJoin: false,
-        requiredGender: 'FEMALE'
-      });
-    }
-    
-    if (category === 'Mixed' && !normalizedGender) {
-      return res.status(400).json({
-        error: 'Gender information is required for mixed gender experiments.',
-        canJoin: false,
-        missingParameter: 'gender',
-        groupName: link.group_name,
-        category: category
-      });
-    }
+    console.log('🔍 Link details:', {
+      proxy_id: link.proxy_id,
+      group_name: link.group_name,
+      max_uses: link.max_uses,
+      current_uses: link.current_uses,
+      is_active: link.is_active,
+      status: link.status
+    });
 
     // Check if user already joined this link
-    const existingUsage = await checkLinkUsage(proxyId, fingerprint);
+    const existingUsage = await checkLinkUsage(proxyId, uniqueIdentifier);
     
     if (existingUsage) {
-      console.log('⚠️ User already joined this room:', {
-        fingerprint: fingerprint.substring(0, 8) + '...',
-        participantNumber: existingUsage.participant_number,
+      // User already joined, check their individual timer
+      const participantTimerStatus = await checkParticipantExpiration(proxyId, uniqueIdentifier);
+      const allCurrentParticipants = await getAllParticipants(proxyId);
+      const isGroupComplete = allCurrentParticipants.length >= link.max_uses;
+      
+      console.log('Existing user rejoining:', {
+        identifier: uniqueIdentifier.substring(0, 15) + '...',
         currentStatus: existingUsage.status,
-        prolificPid: existingUsage.prolific_pid
+        timerExpired: participantTimerStatus.expired,
+        timeLeft: participantTimerStatus.timeLeft,
+        totalParticipants: allCurrentParticipants.length,
+        isGroupComplete
       });
       
-      // Return error - user cannot join again
-      return res.status(403).json({
-        error: 'You have already joined this waiting room. Please use your original tab/window.',
-        canJoin: false,
-        errorType: 'already_joined',
-        participantNumber: existingUsage.participant_number,
-        status: existingUsage.status,
-        joinedAt: existingUsage.joined_at
-      });
+      // Block rejoin if user was already redirected (successfully joined a group)
+      if (existingUsage.status === 'redirected') {
+        return res.status(403).json({
+          error: 'You have already participated in this experiment and were redirected to the study.',
+          canJoin: false,
+          errorType: 'already_participated'
+        });
+      }
+      
+      // Block rejoin if user's timer is still active (not expired)
+      if (existingUsage.status === 'waiting' && !participantTimerStatus.expired) {
+        return res.json({
+          canJoin: true,
+          alreadyJoined: true,
+          status: existingUsage.status,
+          participantNumber: existingUsage.participant_number,
+          groupSessionId: existingUsage.group_session_id,
+          currentWaiting: allCurrentParticipants.length,
+          maxParticipants: link.max_uses,
+          isGroupComplete: isGroupComplete,
+          redirectUrl: isGroupComplete ? link.real_url : null,
+          participantTimerStart: participantTimerStatus.timerStart,
+          participantTimeLeft: participantTimerStatus.timeLeft,
+          participantTimerExpired: participantTimerStatus.expired
+        });
+      }
+      
+      // Allow rejoin if user's timer has expired - they get a fresh start
+      if (existingUsage.status === 'expired' || participantTimerStatus.expired) {
+        console.log('🔄 Allowing expired participant to rejoin with fresh timer:', {
+          identifier: uniqueIdentifier.substring(0, 15) + '...',
+          previousStatus: existingUsage.status,
+          timerExpired: participantTimerStatus.expired
+        });
+        
+        // Delete the old expired record so they can join fresh
+        await deleteExpiredParticipant(proxyId, uniqueIdentifier);
+        
+        logActivity('Expired participant rejoining with fresh timer', { 
+          proxyId, 
+          identifier: uniqueIdentifier.substring(0, 15) + '...',
+          previousStatus: existingUsage.status
+        });
+        
+        // Continue to new participant logic below
+      }
     }
 
     // Check if room has reached maximum capacity
     const allParticipantsCount = await getAllParticipants(proxyId);
     const totalParticipants = allParticipantsCount.length;
+    
+    console.log('🔍 Checking room capacity:', {
+      totalParticipants: totalParticipants,
+      maxCapacity: link.max_uses,
+      groupsFormed: link.groups_formed || 0,
+      isFull: totalParticipants >= link.max_uses
+    });
     
     if (totalParticipants >= link.max_uses) {
       return res.status(403).json({
@@ -121,47 +132,54 @@ export default async function handler(req, res) {
       proxyId, 
       req.headers['x-vercel-id'] || 'unknown', 
       getClientIP(req), 
-      uniqueIdentifier,  // Use unique identifier instead of fingerprint
+      uniqueIdentifier,
       participantNumber,
-      normalizedGender,
       prolific_pid
     );
 
     logActivity('Participant joined waiting room', { 
       proxyId, 
       participantNumber, 
-      gender: normalizedGender,
       prolific_pid: prolific_pid,
       identifier: uniqueIdentifier.substring(0, 15) + '...'
     });
 
-    // NOW check if a group can be formed (AFTER participant is recorded)
-    const groupSize = link.group_size || 3; // Fixed group size of 3
-    const groupFormationResult = await canFormGenderBasedGroup(proxyId, category, groupSize);
-    const canFormGroup = groupFormationResult.canForm;
+    // Simple group formation: First 3 participants form a group
+    const groupSize = 3;
+    const waitingParticipants = await getWaitingParticipants(proxyId);
+    const canFormGroup = waitingParticipants.length >= groupSize;
+
+    console.log('🔍 Simple group formation check:', {
+      proxyId,
+      groupSize,
+      waitingCount: waitingParticipants.length,
+      canForm: canFormGroup
+    });
 
     let groupSessionId = null;
     let isThisParticipantInGroup = false;
     
-    if (canFormGroup && groupFormationResult.participants.length > 0) {
-      // Create group session with the selected participants
-      const participantFingerprints = groupFormationResult.participants.map(p => p.user_fingerprint);
+    if (canFormGroup) {
+      // Take first 3 participants (FIFO)
+      const participantsToGroup = waitingParticipants.slice(0, groupSize);
+      const participantFingerprints = participantsToGroup.map(p => p.user_fingerprint);
       
       // Check if the current participant is in this group
       isThisParticipantInGroup = participantFingerprints.includes(uniqueIdentifier);
       
-      // Pass group type for mixed gender groups
-      groupSessionId = await createGroupSession(
-        proxyId, 
-        participantFingerprints, 
-        groupFormationResult.groupType
-      );
+      console.log('✅ Creating simple group session:', {
+        participantCount: participantFingerprints.length,
+        fingerprints: participantFingerprints.map(fp => fp.substring(0, 8) + '...'),
+        currentParticipantInGroup: isThisParticipantInGroup
+      });
       
-      logActivity('Gender-based group formed - participants redirected', { 
+      groupSessionId = await createGroupSession(proxyId, participantFingerprints);
+      
+      console.log('✅ Group formed! Session:', groupSessionId, '- Room stays open for more participants');
+      
+      logActivity('Simple group formed - participants redirected', { 
         proxyId, 
         groupSessionId,
-        category,
-        groupType: groupFormationResult.groupType || 'standard',
         participantCount: participantFingerprints.length,
         groupNumber: (link.groups_formed || 0) + 1,
         participantFingerprints: participantFingerprints.map(fp => fp.substring(0, 8) + '...')
@@ -170,7 +188,6 @@ export default async function handler(req, res) {
 
     // Get participant's timer status and current counts
     const participantTimerStatus = await checkParticipantExpiration(proxyId, uniqueIdentifier);
-    const waitingParticipants = await getWaitingParticipants(proxyId);
 
     return res.json({
       canJoin: true,
@@ -178,16 +195,14 @@ export default async function handler(req, res) {
       status: isThisParticipantInGroup ? 'redirected' : 'waiting',
       participantNumber: participantNumber,
       currentWaiting: waitingParticipants.length,
-      maxParticipants: link.max_uses, // Total room capacity
-      groupSize: groupSize, // Size of each group
+      maxParticipants: link.max_uses,
+      groupSize: groupSize,
       isGroupComplete: isThisParticipantInGroup,
       groupSessionId: isThisParticipantInGroup ? groupSessionId : null,
       redirectUrl: isThisParticipantInGroup ? link.real_url : null,
       participantTimerStart: participantTimerStatus.timerStart,
       participantTimeLeft: participantTimerStatus.timeLeft,
       participantTimerExpired: participantTimerStatus.expired,
-      category: category,
-      participantGender: normalizedGender,
       groupsFormed: (link.groups_formed || 0) + (canFormGroup ? 1 : 0)
     });
 

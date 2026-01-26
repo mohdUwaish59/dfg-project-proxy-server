@@ -12,7 +12,6 @@ interface Link {
   proxy_id: string;
   group_name: string;
   real_url: string;
-  category?: string;
   treatment_title?: string;
   current_uses: number;
   max_uses: number;

@@ -66,7 +66,6 @@ export default async function handler(req, res) {
     const responseData = {
       ...groupStatus,
       userStatus: userStatus,
-      participantGender: participantGender,
       participantTimerStart: participantTimerStatus?.timerStart || null,
       participantTimeLeft: participantTimerStatus?.timeLeft || 600,
       participantTimerExpired: participantTimerStatus?.expired || false,

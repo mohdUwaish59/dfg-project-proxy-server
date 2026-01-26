@@ -763,9 +763,6 @@ video {
 .mr-2 {
   margin-right: 0.5rem;
 }
-.mt-0\.5 {
-  margin-top: 0.125rem;
-}
 .mt-1 {
   margin-top: 0.25rem;
 }
@@ -981,12 +978,6 @@ video {
 }
 .cursor-default {
   cursor: default;
-}
-.cursor-not-allowed {
-  cursor: not-allowed;
-}
-.cursor-pointer {
-  cursor: pointer;
 }
 .select-none {
   -webkit-user-select: none;
@@ -1210,10 +1201,6 @@ video {
   --tw-border-opacity: 1;
   border-color: rgb(219 39 119 / var(--tw-border-opacity, 1));
 }
-.border-primary-500 {
-  --tw-border-opacity: 1;
-  border-color: rgb(102 126 234 / var(--tw-border-opacity, 1));
-}
 .border-primary-600 {
   --tw-border-opacity: 1;
   border-color: rgb(90 103 216 / var(--tw-border-opacity, 1));
@@ -1240,10 +1227,6 @@ video {
 }
 .border-transparent {
   border-color: transparent;
-}
-.border-white {
-  --tw-border-opacity: 1;
-  border-color: rgb(255 255 255 / var(--tw-border-opacity, 1));
 }
 .border-yellow-300 {
   --tw-border-opacity: 1;
@@ -1332,19 +1315,11 @@ video {
   --tw-bg-opacity: 1;
   background-color: rgb(240 244 255 / var(--tw-bg-opacity, 1));
 }
-.bg-primary-500 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(102 126 234 / var(--tw-bg-opacity, 1));
-}
 .bg-primary\/10 {
   background-color: hsl(var(--primary) / 0.1);
 }
 .bg-primary\/20 {
   background-color: hsl(var(--primary) / 0.2);
-}
-.bg-purple-100 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(243 232 255 / var(--tw-bg-opacity, 1));
 }
 .bg-purple-50 {
   --tw-bg-opacity: 1;
@@ -1523,9 +1498,6 @@ video {
 }
 .to-accent-600 {
   --tw-gradient-to: #2dd4aa var(--tw-gradient-to-position);
-}
-.to-blue-50 {
-  --tw-gradient-to: #eff6ff var(--tw-gradient-to-position);
 }
 .to-emerald-50 {
   --tw-gradient-to: #ecfdf5 var(--tw-gradient-to-position);
@@ -1913,10 +1885,6 @@ video {
   --tw-text-opacity: 1;
   color: rgb(147 51 234 / var(--tw-text-opacity, 1));
 }
-.text-purple-700 {
-  --tw-text-opacity: 1;
-  color: rgb(126 34 206 / var(--tw-text-opacity, 1));
-}
 .text-purple-800 {
   --tw-text-opacity: 1;
   color: rgb(107 33 168 / var(--tw-text-opacity, 1));
@@ -2125,13 +2093,6 @@ video {
 
 .placeholder\:text-muted-foreground::placeholder {
   color: hsl(var(--muted-foreground));
-}
-
-
-
-.hover\:border-gray-300:hover {
-  --tw-border-opacity: 1;
-  border-color: rgb(209 213 219 / var(--tw-border-opacity, 1));
 }
 
 

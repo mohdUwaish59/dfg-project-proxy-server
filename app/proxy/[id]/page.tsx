@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import WaitingRoom from '../../../components/WaitingRoom';
 import ProxyErrorPage from '../../../components/ProxyErrorPage';
-import GenderCollectionForm from '../../../components/GenderCollectionForm';
+
 
 interface ProxyData {
   canJoin?: boolean;
@@ -18,14 +18,12 @@ interface ProxyData {
   groupSessionId?: string;
   redirectUrl?: string;
   groupName?: string;
-  category?: string;
   treatmentTitle?: string;
   participantTimerStart?: number;
   participantTimerExpired?: boolean;
   participantTimeLeft?: number;
   error?: string;
   errorType?: 'not_found' | 'full' | 'already_participated' | 'inactive' | 'already_joined';
-  participantGender?: string;
   joinedAt?: string;
 }
 
@@ -62,111 +60,33 @@ export default function ProxyPage() {
   const [data, setData] = useState<ProxyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [fingerprint, setFingerprint] = useState<string>('');
-  const [gender, setGender] = useState<string | null>(null);
   const [prolificPid, setProlificPid] = useState<string | null>(null);
-  const [showGenderForm, setShowGenderForm] = useState(false);
-  const [linkInfo, setLinkInfo] = useState<{ groupName?: string; category?: string } | null>(null);
 
   useEffect(() => {
     if (proxyId) {
       // Extract URL parameters (from Prolific)
       const urlParams = new URLSearchParams(window.location.search);
-      const genderParam = urlParams.get('gender') || urlParams.get('GENDER');
       const pidParam = urlParams.get('PROLIFIC_PID') || urlParams.get('prolific_pid');
       
-      console.log('🔍 URL Parameters:', { gender: genderParam, prolific_pid: pidParam });
+      console.log('🔍 URL Parameters:', { prolific_pid: pidParam });
       
       setProlificPid(pidParam);
       
       const fp = generateFingerprint();
       setFingerprint(fp);
       
-      // If gender is provided in URL, use it directly
-      if (genderParam) {
-        setGender(genderParam);
-        joinWaitingRoom(fp, genderParam, pidParam);
-      } else {
-        // No gender in URL - need to show form
-        // First, fetch link info to know the category
-        fetchLinkInfo(fp, pidParam);
-      }
+      // Go directly to waiting room (no gender collection needed)
+      joinWaitingRoom(fp, pidParam);
     }
   }, [proxyId]);
 
-  const fetchLinkInfo = async (fp: string, pidParam: string | null) => {
-    try {
-      // Try to join without gender to get link info
-      const response = await fetch(`/api/proxy/${proxyId}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          fingerprint: fp,
-          gender: null,
-          prolific_pid: pidParam
-        })
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok && result.missingParameter === 'gender') {
-        // Gender is required - show form
-        setLinkInfo({
-          groupName: result.groupName,
-          category: result.category
-        });
-        setShowGenderForm(true);
-        setIsLoading(false);
-      } else if (response.ok) {
-        // No gender required or already joined
-        setData(result);
-        setIsLoading(false);
-      } else {
-        // Other error
-        let errorType: 'not_found' | 'full' | 'already_participated' | 'inactive' | 'already_joined' = 'inactive';
-        
-        if (response.status === 404) {
-          errorType = 'not_found';
-        } else if (response.status === 403) {
-          if (result.errorType === 'already_joined') {
-            errorType = 'already_joined';
-          } else if (result.error?.includes('full')) {
-            errorType = 'full';
-          }
-        }
-        
-        setData({
-          error: result.error,
-          errorType: errorType,
-          participantNumber: result.participantNumber,
-          joinedAt: result.joinedAt
-        });
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Error fetching link info:', error);
-      setData({
-        error: 'Network error. Please try again.',
-        errorType: 'inactive'
-      });
-      setIsLoading(false);
-    }
-  };
-
-  const handleGenderSubmit = (selectedGender: string) => {
-    setGender(selectedGender);
-    setShowGenderForm(false);
-    setIsLoading(true);
-    joinWaitingRoom(fingerprint, selectedGender, prolificPid);
-  };
-
-  const joinWaitingRoom = async (fp: string, genderParam: string | null, pidParam: string | null) => {
+  const joinWaitingRoom = async (fp: string, pidParam: string | null) => {
     try {
       const response = await fetch(`/api/proxy/${proxyId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           fingerprint: fp,
-          gender: genderParam,
           prolific_pid: pidParam
         })
       });
@@ -182,7 +102,7 @@ export default function ProxyPage() {
         if (response.status === 404) {
           errorType = 'not_found';
         } else if (response.status === 400) {
-          // Bad request - likely missing gender parameter
+          // Bad request
           errorType = 'inactive';
         } else if (response.status === 403) {
           // Check error type
@@ -267,7 +187,6 @@ export default function ProxyPage() {
           isGroupComplete: thisParticipantRedirected, // Only true if THIS participant is redirected
           redirectUrl: result.real_url,
           groupName: result.group_name,
-          category: result.category,
           treatmentTitle: result.treatment_title,
           participantTimerStart: result.participantTimerStart,
           participantTimerExpired: result.participantTimerExpired,
@@ -349,17 +268,6 @@ export default function ProxyPage() {
     );
   }
 
-  if (showGenderForm) {
-    return (
-      <GenderCollectionForm
-        groupName={linkInfo?.groupName}
-        category={linkInfo?.category}
-        prolificPid={prolificPid || undefined}
-        onSubmit={handleGenderSubmit}
-      />
-    );
-  }
-
   if (data?.error) {
     return (
       <ProxyErrorPage 
@@ -381,10 +289,8 @@ export default function ProxyPage() {
       isGroupComplete={data?.isGroupComplete || false}
       redirectUrl={data?.redirectUrl}
       groupName={data?.groupName}
-      category={data?.category}
       treatmentTitle={data?.treatmentTitle}
       participantTimerStart={data?.participantTimerStart}
-      participantGender={gender || undefined}
     />
   );
 }

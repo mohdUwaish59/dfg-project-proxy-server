@@ -7,7 +7,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from '../contexts/ToastContext';
-import { Loader2, Plus, Users, Link, Copy } from 'lucide-react';
+import { Loader2, Plus, Link, Copy } from 'lucide-react';
 
 interface CreateLinkFormProps {
   onLinkCreated: () => void;
@@ -21,10 +21,8 @@ interface CreatedLinkInfo {
 
 export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
   const [formData, setFormData] = useState({
-    groupName: '',
     realUrl: '',
     otreeSessionId: '',
-    category: '',
     treatmentTitle: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +33,7 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
     e.preventDefault();
     
     // Validate all fields are filled
-    if (!formData.groupName || !formData.realUrl || !formData.otreeSessionId || !formData.category || !formData.treatmentTitle) {
+    if (!formData.realUrl || !formData.otreeSessionId || !formData.treatmentTitle) {
       showToast('error', 'Validation Error', 'Please fill in all required fields');
       return;
     }
@@ -64,7 +62,7 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
         });
         
         showToast('success', 'Success', 'Experiment link created successfully!');
-        setFormData({ groupName: '', realUrl: '', otreeSessionId: '', category: '', treatmentTitle: '' });
+        setFormData({ realUrl: '', otreeSessionId: '', treatmentTitle: '' });
         onLinkCreated();
       } else {
         const data = await response.json();
@@ -102,38 +100,6 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="groupName" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Group Name
-                <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.groupName}
-                onValueChange={(value) => setFormData({ ...formData, groupName: value })}
-                disabled={isLoading}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select group name" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="T1:MMM">T1:MMM</SelectItem>
-                  <SelectItem value="T1:FFF">T1:FFF</SelectItem>
-                  <SelectItem value="T1:MIXED">T1:MIXED</SelectItem>
-                  <SelectItem value="T2:MMM">T2:MMM</SelectItem>
-                  <SelectItem value="T2:FFF">T2:FFF</SelectItem>
-                  <SelectItem value="T2:MIXED">T2:MIXED</SelectItem>
-                  <SelectItem value="T3:MMM">T3:MMM</SelectItem>
-                  <SelectItem value="T3:FFF">T3:FFF</SelectItem>
-                  <SelectItem value="T3:MIXED">T3:MIXED</SelectItem>
-                  <SelectItem value="T4:MMM">T4:MMM</SelectItem>
-                  <SelectItem value="T4:FFF">T4:FFF</SelectItem>
-                  <SelectItem value="T4:MIXED">T4:MIXED</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="realUrl" className="flex items-center gap-2">
                 <Link className="h-4 w-4" />
@@ -173,65 +139,41 @@ export default function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps) {
             </p>
           </div>
 
-          {/* New Category and Treatment Fields */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="category">
-                Category
-                <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
-                disabled={isLoading}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Male">All Male</SelectItem>
-                  <SelectItem value="All Female">All Female</SelectItem>
-                  <SelectItem value="Mixed">Mixed Gender</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="treatmentTitle">
-                Treatment Title
-                <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={formData.treatmentTitle}
-                onValueChange={(value) => setFormData({ ...formData, treatmentTitle: value })}
-                disabled={isLoading}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select treatment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Treatment 1: No communication – No Gender Information">
-                    Treatment 1: No communication – No Gender Information
-                  </SelectItem>
-                  <SelectItem value="Treatment 2: Chat Communication – No Gender Information">
-                    Treatment 2: Chat Communication – No Gender Information
-                  </SelectItem>
-                  <SelectItem value="Treatment 3: Chat Communication – Gender Information">
-                    Treatment 3: Chat Communication – Gender Information
-                  </SelectItem>
-                  <SelectItem value="Treatment 4: Video Chat Communication">
-                    Treatment 4: Video Chat Communication
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Treatment Title Field */}
+          <div className="space-y-2">
+            <Label htmlFor="treatmentTitle">
+              Treatment Title
+              <span className="text-red-500">*</span>
+            </Label>
+            <Select
+              value={formData.treatmentTitle}
+              onValueChange={(value) => setFormData({ ...formData, treatmentTitle: value })}
+              disabled={isLoading}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select treatment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Treatment 1: No communication – No Gender Information">
+                  Treatment 1: No communication – No Gender Information
+                </SelectItem>
+                <SelectItem value="Treatment 2: Chat Communication – No Gender Information">
+                  Treatment 2: Chat Communication – No Gender Information
+                </SelectItem>
+                <SelectItem value="Treatment 3: Chat Communication – Gender Information">
+                  Treatment 3: Chat Communication – Gender Information
+                </SelectItem>
+                <SelectItem value="Treatment 4: Video Chat Communication">
+                  Treatment 4: Video Chat Communication
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button 
             type="submit" 
-            disabled={isLoading || !formData.groupName || !formData.realUrl || !formData.otreeSessionId || !formData.category || !formData.treatmentTitle} 
+            disabled={isLoading || !formData.realUrl || !formData.otreeSessionId || !formData.treatmentTitle} 
             className="w-full md:w-auto bg-gradient-to-r from-success-600 to-success-700 hover:from-success-700 hover:to-success-800"
           >
             {isLoading ? (

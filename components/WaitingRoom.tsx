@@ -23,10 +23,8 @@ interface WaitingRoomProps {
   isGroupComplete: boolean;
   redirectUrl?: string;
   groupName?: string;
-  category?: string;
   treatmentTitle?: string;
   participantTimerStart?: number; // Timestamp when this participant joined
-  participantGender?: string; // Participant's gender
 }
 
 export default function WaitingRoom({
@@ -38,10 +36,8 @@ export default function WaitingRoom({
   isGroupComplete,
   redirectUrl,
   groupName,
-  category,
   treatmentTitle,
-  participantTimerStart,
-  participantGender
+  participantTimerStart
 }: WaitingRoomProps) {
   const [countdown, setCountdown] = useState(3);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -129,30 +125,11 @@ export default function WaitingRoom({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Calculate effective group count considering Mixed Gender rules
+  // Calculate effective group count - simplified (no gender logic)
   const getEffectiveGroupCount = () => {
-    if (category !== 'Mixed') {
-      // For All Male, All Female, or No Gender - use simple math
-      return currentWaiting % 3 || 3;
-    }
-    
-    // For Mixed Gender rooms - conservative approach
-    // Never show "3/3" unless we're actually redirected
-    // This prevents the "Group is full" issue
-    
-    if (currentWaiting === 0) return 0;
-    if (currentWaiting === 1) return 1;
-    if (currentWaiting === 2) return 2;
-    
-    // For 3+ participants in Mixed room:
-    // If we're still waiting (not redirected), it means the current 3 can't form a valid group
-    // So show it as if we're starting a new group
-    if (status === 'waiting') {
-      const remainder = currentWaiting % 3;
-      return remainder === 0 ? 1 : remainder; // Never show 3/3 if still waiting
-    }
-    
-    return currentWaiting % 3 || 3;
+    // The backend already returns only waiting participants in currentWaiting
+    // So we can use it directly, but cap it at 3 for display purposes
+    return Math.min(currentWaiting, 3);
   };
 
   const getStatusMessage = () => {
@@ -164,11 +141,10 @@ export default function WaitingRoom({
       return "Your group is complete! Redirecting to experiment...";
     }
 
-    // For pool-based system, show waiting for group formation
+    // Simple group formation messages
     const effectiveCount = getEffectiveGroupCount();
     const neededForGroup = 3 - effectiveCount;
     
-    // Generic messages (no gender-specific information)
     if (neededForGroup === 1) {
       return "Waiting for 1 more participant to form a group...";
     }
@@ -257,8 +233,6 @@ export default function WaitingRoom({
                 You are Participant #{participantNumber}
               </Badge>
             </div>
-
-
 
             {/* Progress Section */}
             {!(participantTimerExpired || status === 'expired') && (
@@ -379,8 +353,6 @@ export default function WaitingRoom({
                 </motion.div>
               )}
             </AnimatePresence>
-
-
 
             {/* Instructions */}
             {!(participantTimerExpired || status === 'expired') && (
