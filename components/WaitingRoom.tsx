@@ -41,7 +41,7 @@ export default function WaitingRoom({
 }: WaitingRoomProps) {
   const [countdown, setCountdown] = useState(3);
   const [showCountdown, setShowCountdown] = useState(false);
-  const [participantTimeLeft, setParticipantTimeLeft] = useState(600); // 10 minutes in seconds
+  const [participantTimeLeft, setParticipantTimeLeft] = useState(900); // 15 minutes in seconds
   const [participantTimerExpired, setParticipantTimerExpired] = useState(false);
 
   const progressPercentage = (currentWaiting / maxParticipants) * 100;
@@ -71,14 +71,14 @@ export default function WaitingRoom({
       // Use backend-provided start time for accurate synchronization
       const now = Date.now();
       const elapsed = Math.floor((now - participantTimerStart) / 1000);
-      const initialTimeLeft = Math.max(0, 600 - elapsed);
+      const initialTimeLeft = Math.max(0, 900 - elapsed);
       setParticipantTimeLeft(initialTimeLeft);
 
       if (initialTimeLeft > 0) {
         timer = setInterval(() => {
           const currentTime = Date.now();
           const totalElapsed = Math.floor((currentTime - participantTimerStart) / 1000);
-          const timeLeft = Math.max(0, 600 - totalElapsed); // 10 minutes = 600 seconds
+          const timeLeft = Math.max(0, 900 - totalElapsed); // 15 minutes = 900 seconds
 
           console.log('Participant timer update - elapsed:', totalElapsed, 'timeLeft:', timeLeft);
           setParticipantTimeLeft(timeLeft);
@@ -303,7 +303,7 @@ export default function WaitingRoom({
                       <span className="font-semibold">Your Time Expired</span>
                     </div>
                     <p className="text-red-600 text-sm mb-3">
-                      Your 10-minute waiting period has ended. You were not matched with a group in time.
+                      Your 15-minute waiting period has ended. You were not matched with a group in time.
                     </p>
                     <div className="mt-4 text-xs text-red-500">
                       You may close this page or contact the experiment administrator.
@@ -370,7 +370,7 @@ export default function WaitingRoom({
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 font-bold">•</span>
-                    <span><strong>You have 10 minutes</strong> to be matched with a group</span>
+                    <span><strong>You have 15 minutes</strong> to be matched with a group</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-primary-600 font-bold">•</span>

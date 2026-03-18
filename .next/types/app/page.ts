@@ -1,4 +1,4 @@
-// File: C:\Users\Mohd Uwaish\Desktop\MS\DFG\project\DFG\DFG_2025_Latest_work\proxy-nov\dfg-project-proxy-server\app\page.tsx
+// File: C:\Users\Mohd Uwaish\Desktop\MS\DFG\project\DFG\dfg-assets-17-march-2026\dfg-project-proxy-server\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
