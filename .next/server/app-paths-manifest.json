@@ -1,3 +1,9 @@
 {
+  "/_not-found": "app/_not-found.js",
+  "/admin/page": "app/admin/page.js",
+  "/proxy/[id]/page": "app/proxy/[id]/page.js",
+  "/redirect/female/page": "app/redirect/female/page.js",
+  "/redirect/male/page": "app/redirect/male/page.js",
+  "/redirect/[proxyId]/page": "app/redirect/[proxyId]/page.js",
   "/page": "app/page.js"
 }
