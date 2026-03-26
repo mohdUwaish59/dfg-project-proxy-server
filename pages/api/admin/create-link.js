@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   const { realUrl, treatmentTitle, otreeSessionId } = req.body;
-  const maxUses = 200; // Room capacity - can accommodate up to 200 participants
+  const maxUses = 2000; // Room capacity - can accommodate up to 2000 participants
   
   // Validate input
   if (!isValidUrl(realUrl)) {
